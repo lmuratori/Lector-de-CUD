@@ -1,0 +1,17 @@
+{
+  "name": "Lector CUD - Dr. Muratori",
+  "short_name": "Lector CUD",
+  "description": "Lectura y análisis de Certificados Únicos de Discapacidad con Gemini, clasificación según Ley 22.431 y generación de informes.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF1EC",
+  "theme_color": "#244C46",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

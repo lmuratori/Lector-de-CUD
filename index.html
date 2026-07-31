@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<!--
+  LECTOR CUD — Dr. Luis Muratori
+  ================================
+  App standalone (HTML + CSS + JS puro, sin frameworks ni build step)
+  para leer Certificados Únicos de Discapacidad con Gemini, clasificarlos
+  según la Ley 22.431 y las directivas de SENADIS, y generar informes,
+  guías para pacientes y seguimiento de trámites.
+
+  Código abierto y de tu propiedad: podés leerlo, copiarlo y modificarlo
+  libremente, con cualquier editor de texto. No requiere compilación ni
+  dependencias de servidor propias — todo corre en el navegador del
+  dispositivo donde se abre.
+
+  Funcionalidades incluidas:
+  - Lectura de CUD por foto (cámara/galería) o PDF, vía Gemini API
+  - Clasificación automática según Ley 22.431 y directivas SENADIS
+  - Diccionario y traductor de códigos CIF (con sub-clasificación)
+  - Agenda de carpetas por paciente (nombre, DNI, teléfono), buscable
+  - Documentos por carpeta (CUD, DNI, estudios aportados)
+  - Informe médico de cotejo (11 secciones, editable, exportable a Word)
+  - Guía para el paciente en lenguaje simple
+  - Estado y seguimiento del trámite, con historial de actualizaciones
+  - Modo independiente o conectado a un backend propio (Apps Script)
+  - Copia de seguridad exportable/importable (JSON)
+  - Instalable como app (PWA) en Android, iOS, Windows y Mac
+
+  Ver MANUAL_DE_USUARIO.md (uso diario) y MANUAL_INSTALACION.md (instalación).
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lector CUD">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#244C46">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Lector CUD · Dr. Muratori</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF1EC; --paper:#FCFCFA; --ink:#1B2420; --ink-soft:#51594F; --ink-faint:#8B9187;
+    --primary:#244C46; --primary-light:#3C6E63; --primary-pale:#DCE7E2;
+    --accent:#9C4B2E; --accent-pale:#F2E1D8; --stamp:#A9863F; --line:#D7DBD1; --danger:#A23A2E;
+    --radius:14px; --shadow:0 1px 2px rgba(27,36,32,0.06), 0 6px 20px rgba(27,36,32,0.07);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;position:relative;}
+  h1,h2,h3{font-family:'Source Serif 4',serif;font-weight:600;color:var(--ink);margin:0;}
+  .topbar{padding:22px 20px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Source Serif 4',serif;font-weight:600;font-size:15px;flex-shrink:0;}
+  .brand-text{line-height:1.15;}
+  .brand-text .t1{font-family:'Source Serif 4',serif;font-size:17px;font-weight:600;}
+  .brand-text .t2{font-size:11px;color:var(--ink-faint);letter-spacing:.02em;}
+  .iconbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);}
+  .iconbtn:active{transform:scale(0.94);}
+  .backrow{display:flex;align-items:center;gap:10px;padding:18px 20px 0;}
+  .backrow .iconbtn{transform:rotate(180deg);}
+  .screen{padding:0 20px 130px;flex:1;display:none;flex-direction:column;gap:16px;animation:fadein .25s ease;}
+  .screen.active{display:flex;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);}
+  .muted{color:var(--ink-soft);font-size:14px;line-height:1.5;}
+  .faint{color:var(--ink-faint);font-size:12.5px;}
+  label{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:6px;}
+  input[type=text],input[type=password],input[type=date],input[type=url],input[type=tel],input[type=search],textarea,select{
+    width:100%;font-family:'IBM Plex Sans',sans-serif;font-size:15px;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);margin-bottom:14px;
+  }
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--primary-light);outline-offset:1px;}
+  textarea{resize:vertical;line-height:1.55;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:15px;padding:13px 18px;border-radius:11px;border:none;cursor:pointer;width:100%;transition:transform .08s ease;}
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-accent{background:var(--accent);color:#fff;}
+  .btn-outline{background:transparent;color:var(--primary);border:1.5px solid var(--primary);}
+  .btn-ghost{background:var(--primary-pale);color:var(--primary);}
+  .btn-sm{padding:9px 14px;font-size:13.5px;width:auto;border-radius:9px;}
+  .btn-row{display:flex;gap:10px;}
+  .btn-row .btn{flex:1;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .capture-options{display:flex;flex-direction:column;gap:10px;}
+  .capture-opt{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:1.5px solid var(--line);background:#fff;cursor:pointer;text-align:left;}
+  .capture-opt:active{background:var(--primary-pale);}
+  .capture-opt .op-icon{width:40px;height:40px;border-radius:50%;background:var(--primary-pale);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .capture-opt .op-text .op-title{font-weight:600;font-size:14.5px;}
+  .capture-opt .op-text .op-sub{font-size:12px;color:var(--ink-faint);}
+  .empty{text-align:center;padding:50px 20px;color:var(--ink-faint);}
+  .empty .glyph{font-size:34px;margin-bottom:10px;}
+  .hist-item{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--paper);border:1px solid var(--line);border-radius:12px;cursor:pointer;}
+  .hist-item:active{background:var(--primary-pale);}
+  .hist-item .name{font-weight:600;font-size:15px;}
+  .hist-item .sub{font-size:12.5px;color:var(--ink-faint);margin-top:2px;}
+  .chip{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:4px 9px;border-radius:20px;background:var(--primary-pale);color:var(--primary);text-transform:uppercase;white-space:nowrap;}
+  .chip.done{background:#DDE8DC;color:#3A6B45;}
+  .chip.warn{background:var(--accent-pale);color:var(--accent);}
+  .preview-box{border:1.5px dashed var(--primary-light);border-radius:var(--radius);padding:20px 16px;text-align:center;background:var(--primary-pale);}
+  .preview-box img{max-width:100%;border-radius:10px;display:block;margin:0 auto;}
+  .pdf-chip{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:13.5px;font-weight:600;color:var(--primary);}
+  .fab{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--primary);color:#fff;border:none;border-radius:32px;padding:16px 26px;box-shadow:0 8px 24px rgba(36,76,70,0.35);font-family:'IBM Plex Sans',sans-serif;font-weight:700;font-size:15.5px;cursor:pointer;z-index:50;}
+  .fab:active{transform:translateX(-50%) scale(0.97);}
+  .fab-wrap{position:relative;max-width:480px;margin:0 auto;}
+  .stamp{position:relative;width:96px;height:96px;margin:6px auto 2px;border:2.5px solid var(--stamp);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--stamp);font-family:'Source Serif 4',serif;font-weight:600;font-size:11px;text-align:center;line-height:1.25;letter-spacing:.03em;text-transform:uppercase;transform:rotate(-8deg);}
+  .stamp::before{content:'';position:absolute;inset:6px;border:1px solid var(--stamp);border-radius:50%;}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--primary-pale);border-top-color:var(--primary);animation:spin 0.8s linear infinite;margin:0 auto;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--primary);margin:2px 0 -2px;}
+  .divider{height:1px;background:var(--line);margin:4px 0;border:none;}
+  .studies-list{margin:0;padding-left:18px;font-size:14px;line-height:1.7;color:var(--ink);}
+  .signer-row{display:flex;gap:8px;}
+  .signer-row input{flex:1;}
+  .note-box{background:var(--accent-pale);border:1px solid var(--accent);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--ink);line-height:1.5;}
+  .refs{font-size:12px;color:var(--ink-faint);margin-top:8px;line-height:1.6;}
+  .refs a{color:var(--primary);}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 20px;border-radius:30px;font-size:13.5px;box-shadow:var(--shadow);z-index:200;max-width:88%;text-align:center;}
+  a.linklike{color:var(--primary);font-weight:600;cursor:pointer;text-decoration:underline;}
+  .removebtn{background:none;border:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;padding:6px 0;}
+  .modechip{display:flex;gap:8px;margin-bottom:14px;}
+  .modechip label{flex:1;text-align:center;border:1.5px solid var(--line);border-radius:10px;padding:10px 6px;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;text-transform:none;letter-spacing:0;}
+  .modechip input{display:none;}
+  .modechip input:checked + span{color:var(--primary);}
+  .hidden{display:none !important;}
+  .folder-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .folder-title{font-size:19px;font-weight:600;font-family:'Source Serif 4',serif;}
+  .folder-meta{font-size:12.5px;color:var(--ink-faint);margin-top:3px;line-height:1.6;}
+  .doc-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:8px;}
+  .doc-item .doc-icon{width:32px;height:32px;border-radius:8px;background:var(--primary-pale);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .doc-item .doc-info{flex:1;min-width:0;}
+  .doc-item .doc-info .n{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .doc-item .doc-info .s{font-size:11.5px;color:var(--ink-faint);}
+  .doc-item .doc-actions{display:flex;gap:6px;}
+  .doc-actions button{background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:6px;}
+  .catpicker{display:flex;gap:8px;margin-bottom:12px;}
+  .catpicker .cat{flex:1;text-align:center;padding:10px 4px;border:1.5px solid var(--line);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);}
+  .catpicker .cat.sel{border-color:var(--primary);color:var(--primary);background:var(--primary-pale);}
+  .timeline{display:flex;flex-direction:column;gap:10px;}
+  .tl-item{border-left:2px solid var(--primary-light);padding-left:12px;position:relative;}
+  .tl-item::before{content:'';position:absolute;left:-5px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--primary-light);}
+  .tl-fecha{font-size:11.5px;color:var(--ink-faint);}
+  .tl-texto{font-size:14px;line-height:1.5;margin-top:2px;}
+  .search-wrap{position:relative;}
+  .search-wrap input{padding-left:38px;}
+  .search-wrap .sicon{position:absolute;left:12px;top:12px;color:var(--ink-faint);}
+
+  /* Pantallas más anchas: Windows / notebooks / tablets */
+  @media (min-width: 720px){
+    #app{max-width:840px;}
+    .fab-wrap{max-width:840px;}
+    #carpetas-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    #documentos-list{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    #documentos-list .doc-item{margin-bottom:0;}
+    .capture-options{flex-direction:row;}
+    .capture-opt{flex:1;flex-direction:column;text-align:center;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">CUD</div>
+      <div class="brand-text"><div class="t1">Lector de CUD</div><div class="t2">Dr. Luis Muratori</div></div>
+    </div>
+    <div class="iconbtn" onclick="goto('settings')" title="Configuración">⚙</div>
+  </div>
+
+  <!-- SETUP -->
+  <div class="screen" id="screen-setup">
+    <div class="card">
+      <h2>Configurar Gemini</h2>
+      <p class="muted">Esta app usa tu propia clave de API de Gemini para leer la foto o el PDF del CUD. Queda guardada solo en este dispositivo.</p>
+      <label>Clave de API de Gemini</label>
+      <input type="password" id="input-apikey" placeholder="AIza...">
+      <label>Modelo</label>
+      <select id="input-model">
+        <option value="gemini-3.5-flash">gemini-3.5-flash (recomendado, más rápido)</option>
+        <option value="gemini-3.6-flash">gemini-3.6-flash (más nuevo, muy eficiente)</option>
+        <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (más preciso, más lento)</option>
+      </select>
+      <label>Email para compartir informes</label>
+      <input type="text" id="input-email" value="drluismuratori@gmail.com">
+      <button class="btn btn-primary" onclick="saveConfig()">Guardar y continuar</button>
+    </div>
+    <div class="note-box">Ninguna foto ni dato del paciente se envía a Anthropic ni queda en este archivo: todo el análisis va directo de tu celular a la API de Gemini con tu clave. Los documentos y carpetas se guardan solo en este dispositivo (IndexedDB).</div>
+  </div>
+
+  <!-- HOME / AGENDA -->
+  <div class="screen" id="screen-home">
+    <div class="card">
+      <div class="section-title" style="margin-bottom:10px;">Buscar carpeta</div>
+      <div class="search-wrap">
+        <span class="sicon">🔎</span>
+        <input type="search" id="search-box" placeholder="Buscar por nombre o DNI…" oninput="renderCarpetas()">
+      </div>
+    </div>
+    <div>
+      <div class="section-title" style="margin-bottom:10px;">Agenda de pacientes</div>
+      <div id="carpetas-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+
+  <!-- CAPTURE (sirve para analizar CUD o para agregar un documento a una carpeta) -->
+  <div class="screen" id="screen-capture">
+    <div class="backrow"><div class="iconbtn" onclick="goto(captureContext.returnTo||'home')">➜</div><h2 id="capture-title">Analizar CUD</h2></div>
+    <div class="card">
+      <div class="capture-options" id="capture-options">
+        <div class="capture-opt" onclick="document.getElementById('file-camera').click()">
+          <div class="op-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></svg></div>
+          <div class="op-text"><div class="op-title">Tomar foto</div><div class="op-sub">Usa la cámara del celular</div></div>
+        </div>
+        <div class="capture-opt" onclick="document.getElementById('file-gallery').click()">
+          <div class="op-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-4 4-2-2-6 6"/></svg></div>
+          <div class="op-text"><div class="op-title">Elegir foto de la galería</div><div class="op-sub">Una foto ya sacada antes</div></div>
+        </div>
+        <div class="capture-opt" onclick="document.getElementById('file-pdf').click()">
+          <div class="op-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg></div>
+          <div class="op-text"><div class="op-title">Subir un PDF</div><div class="op-sub">Documento escaneado o digital</div></div>
+        </div>
+      </div>
+      <input type="file" id="file-camera" accept="image/*" capture="environment" style="display:none" onchange="onFileSelected(event)">
+      <input type="file" id="file-gallery" accept="image/*" style="display:none" onchange="onFileSelected(event)">
+      <input type="file" id="file-pdf" accept="application/pdf" style="display:none" onchange="onFileSelected(event)">
+      <div id="preview-area" style="margin-top:14px;"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goto(captureContext.returnTo||'home')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-analyze" disabled onclick="onCaptureConfirm()">Analizar con Gemini</button>
+    </div>
+  </div>
+
+  <!-- ANALYZING -->
+  <div class="screen" id="screen-analyzing">
+    <div class="card" style="text-align:center;padding:50px 18px;">
+      <div class="spinner"></div>
+      <p class="muted" style="margin-top:18px;" id="analyzing-text">Leyendo el certificado con Gemini…</p>
+    </div>
+  </div>
+
+  <!-- RESULT (lectura/edición del informe CUD) -->
+  <div class="screen" id="screen-result">
+    <div class="backrow"><div class="iconbtn" onclick="goto('carpeta')">➜</div><h2>Informe CUD</h2></div>
+    <div class="card" style="text-align:center;"><div class="stamp">Lectura<br>completa</div></div>
+
+    <div class="card">
+      <div class="section-title">Datos del paciente</div><hr class="divider">
+      <label>Nombre y apellido</label><input type="text" id="f-nombre">
+      <label>DNI</label><input type="text" id="f-dni" class="mono">
+      <label>Teléfono</label><input type="tel" id="f-telefono" placeholder="ej: 261 555-1234">
+      <label>Fecha de nacimiento</label><input type="text" id="f-fnac" placeholder="dd/mm/aaaa">
+    </div>
+
+    <div class="card">
+      <div class="section-title">Diagnóstico y clasificación</div><hr class="divider">
+      <label>Diagnóstico consignado en el CUD</label><textarea id="f-diagnostico" rows="3"></textarea>
+      <label>Códigos CIE / CIF observados</label><input type="text" id="f-codigos" onchange="renderGlosarioCodigos()" onblur="renderGlosarioCodigos()">
+      <div class="faint" style="margin:-6px 0 12px;">Glosario de códigos CIF (traducción a lenguaje claro):</div>
+      <div id="codigos-glosario" style="margin-bottom:14px;"></div>
+      <label>Tipo de discapacidad (Ley 22.431)</label>
+      <select id="f-tipo" onchange="onTipoChange()">
+        <option value="Motora / física">Motora / física</option>
+        <option value="Sensorial - Visual">Sensorial - Visual</option>
+        <option value="Sensorial - Auditiva">Sensorial - Auditiva</option>
+        <option value="Mental - Intelectual">Mental - Intelectual</option>
+        <option value="Mental - Psicosocial">Mental - Psicosocial (salud mental)</option>
+        <option value="Visceral">Visceral</option>
+        <option value="Mixta">Mixta</option>
+      </select>
+      <label>Subtipo / detalle</label><input type="text" id="f-subtipo" placeholder="ej: renal, columna lumbar, TEA, etc.">
+    </div>
+
+    <div class="card">
+      <div class="section-title">Certificado</div><hr class="divider">
+      <label>Modalidad</label><input type="text" id="f-modalidad" placeholder="Permanente / Transitorio (plazo)">
+      <label>Orientación de la prestación</label><textarea id="f-orientacion" rows="2"></textarea>
+      <div class="btn-row">
+        <div style="flex:1;"><label>Fecha de emisión</label><input type="text" id="f-emision" placeholder="dd/mm/aaaa"></div>
+        <div style="flex:1;"><label>Fecha de vencimiento</label><input type="text" id="f-vencimiento" placeholder="dd/mm/aaaa"></div>
+      </div>
+      <label>Junta Evaluadora / jurisdicción</label><input type="text" id="f-junta">
+      <label>Firmantes</label><div id="firmantes-list"></div>
+      <button class="btn btn-sm btn-ghost" onclick="addFirmante('','','')">+ Agregar firmante</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Estudios recomendados para renovación</div><hr class="divider">
+      <p class="faint">Según directivas vigentes de la Secretaría Nacional de Discapacidad (SENADIS), dependiente del Ministerio de Salud.</p>
+      <ul class="studies-list" id="studies-list"></ul>
+      <div class="refs" id="studies-refs"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Prestaciones adquiridas con el CUD</div><hr class="divider">
+      <p class="faint">Cobertura general según Ley 24.901 (100% a cargo de obra social/prepaga, o del Estado si no tiene cobertura) y Ley 22.431.</p>
+      <ul class="studies-list" id="prestaciones-list"></ul>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Efectores probables en la provincia (Mendoza)</div><hr class="divider">
+      <textarea id="f-efectores" rows="6" style="font-size:13.5px;"></textarea>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('f-efectores').value = defaultEfectores()">↻ Restaurar sugerencia</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Prestación económica vinculada</div><hr class="divider">
+      <label>Tipo</label>
+      <select id="f-pension-tipo">
+        <option value="No aplica / no gestionada">No aplica / no gestionada</option>
+        <option value="Contributiva (Retiro por Invalidez — ANSES, Ley 24.241)">Contributiva (Retiro por Invalidez — ANSES, Ley 24.241)</option>
+        <option value="No contributiva (Pensión No Contributiva por Invalidez — ANSES)">No contributiva (Pensión No Contributiva por Invalidez — ANSES)</option>
+        <option value="A evaluar">A evaluar</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Trazabilidad del aporte y prestaciones no incluidas</div><hr class="divider">
+      <textarea id="f-trazabilidad" rows="5" style="font-size:13.5px;"></textarea>
+      <button class="btn btn-sm btn-outline" onclick="document.getElementById('f-trazabilidad').value = defaultTrazabilidad()">↻ Restaurar sugerencia</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Carta / informe para su superior</div><hr class="divider">
+      <textarea id="f-carta" rows="18" style="font-size:13.5px;"></textarea>
+      <button class="btn btn-sm btn-outline" onclick="regenerarCarta()">↻ Regenerar carta con estos datos</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="goto('carpeta')">Descartar cambios</button>
+      <button class="btn btn-primary" onclick="guardarInforme()">Guardar en la carpeta</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="descargarWordInforme()">Descargar Word (.doc)</button>
+      <button class="btn btn-accent" onclick="compartirPorMail()">Compartir / Enviar por mail</button>
+    </div>
+  </div>
+
+  <!-- CARPETA (detalle de la carpeta de un paciente) -->
+  <div class="screen" id="screen-carpeta">
+    <div class="backrow"><div class="iconbtn" onclick="goto('home')">➜</div><h2>Carpeta del paciente</h2></div>
+
+    <div class="card">
+      <div class="folder-header">
+        <div>
+          <div class="folder-title" id="cp-nombre">-</div>
+          <div class="folder-meta" id="cp-meta">-</div>
+        </div>
+        <span class="chip" id="cp-estado-chip">-</span>
+      </div>
+      <div class="btn-row" style="margin-top:14px;">
+        <div style="flex:1;"><label>Teléfono</label><input type="tel" id="cp-telefono" onchange="actualizarDatosCarpeta()"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-bottom:10px;">Documentos de la carpeta</div>
+      <div id="documentos-list"></div>
+      <div class="catpicker" id="add-doc-catpicker">
+        <div class="cat sel" data-cat="CUD" onclick="selectAddDocCat(this)">CUD</div>
+        <div class="cat" data-cat="DNI" onclick="selectAddDocCat(this)">DNI</div>
+        <div class="cat" data-cat="Aportado" onclick="selectAddDocCat(this)">Estudio / aportado</div>
+      </div>
+      <button class="btn btn-sm btn-ghost" onclick="abrirAgregarDocumento()">+ Agregar documento</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title" style="margin-bottom:10px;">Informe CUD</div>
+      <p class="muted" id="cp-informe-resumen">Todavía no se generó un informe en esta carpeta.</p>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" onclick="editarInformeDesdeCarpeta()">Ver / editar informe</button>
+        <button class="btn btn-ghost btn-sm" onclick="analizarNuevoCudParaCarpeta()">+ Leer nuevo CUD</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Guía para el paciente</div><hr class="divider">
+      <p class="faint">Documento en lenguaje simple para entregarle al paciente: qué significa su discapacidad y qué papeles necesita para iniciar o renovar el CUD.</p>
+      <textarea id="guia-texto" rows="14" style="font-size:13.5px;"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" onclick="regenerarGuia()">↻ Generar / actualizar guía</button>
+        <button class="btn btn-ghost btn-sm" onclick="descargarWordGuia()">Descargar Word</button>
+      </div>
+      <button class="btn btn-accent" style="margin-top:10px;" onclick="compartirGuia()">Compartir con el paciente</button>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Estado y seguimiento del trámite</div><hr class="divider">
+      <label>Estado actual</label>
+      <select id="cp-estado-select" onchange="cambiarEstadoRapido()">
+        <option>Vigente</option>
+        <option>Trámite de renovación en curso</option>
+        <option>Documentación incompleta</option>
+        <option>Presentado ante Junta Evaluadora</option>
+        <option>Pendiente resolución</option>
+        <option>Finalizado</option>
+      </select>
+      <label>Recomendaciones</label>
+      <textarea id="cp-recomendaciones" rows="4" onchange="guardarRecomendaciones()"></textarea>
+      <div class="section-title" style="margin:10px 0 6px;">Historial de actualizaciones</div>
+      <div class="timeline" id="timeline-list"></div>
+      <textarea id="nueva-actualizacion" rows="2" placeholder="Escribí una novedad para agregar al historial…" style="margin-top:10px;"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" onclick="agregarActualizacion()">+ Agregar actualización</button>
+        <button class="btn btn-ghost btn-sm" onclick="descargarWordSeguimiento()">Descargar seguimiento (Word)</button>
+      </div>
+      <button class="btn btn-accent" style="margin-top:10px;" onclick="marcarFinalizada()">Marcar trámite como finalizado</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen" id="screen-settings">
+    <div class="card">
+      <h2>Configuración</h2>
+      <label>Clave de API de Gemini</label><input type="password" id="set-apikey">
+      <label>Modelo</label>
+      <select id="set-model">
+        <option value="gemini-3.5-flash">gemini-3.5-flash (recomendado, más rápido)</option>
+        <option value="gemini-3.6-flash">gemini-3.6-flash (más nuevo, muy eficiente)</option>
+        <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview (más preciso, más lento)</option>
+      </select>
+      <label>Email para compartir informes</label><input type="text" id="set-email">
+      <label>Nombre y apellido del médico (firma de los informes)</label><input type="text" id="set-doctor-nombre" placeholder="Dr. Luis Muratori">
+      <label>Matrícula profesional (opcional)</label><input type="text" id="set-doctor-matricula" placeholder="Mat. N.º ...">
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:12px;">Modo de funcionamiento</div>
+      <div class="modechip">
+        <label><input type="radio" name="modo" value="independiente" onchange="onModoChange()"><span>Independiente</span></label>
+        <label><input type="radio" name="modo" value="conectado" onchange="onModoChange()"><span>Conectado a Sistema Médico Muratori</span></label>
+      </div>
+      <p class="faint" style="margin-bottom:12px;">En modo conectado, además de guardar todo en este celular, cada informe se envía a tu backend Apps Script.</p>
+      <div id="conectado-fields" class="hidden">
+        <label>URL del backend (Web App de Apps Script)</label><input type="url" id="set-backend-url" placeholder="https://script.google.com/macros/s/.../exec">
+        <label>Token de autenticación</label><input type="password" id="set-backend-token">
+        <p class="faint">Incluí <code>apps-script-cud-endpoint.gs</code> en el ZIP con el código de ejemplo para tu proyecto.</p>
+      </div>
+    </div>
+    <div class="card"><button class="btn btn-primary" onclick="saveConfig(true)">Guardar cambios</button></div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:8px;">Copia de seguridad</div>
+      <p class="muted" style="margin-bottom:10px;">Las carpetas viven solo en este dispositivo. Se recomienda exportar una copia periódicamente (por ejemplo, antes de cambiar de celular o de borrar datos del navegador).</p>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm" onclick="exportarBackup()">Exportar copia (.json)</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('import-backup-input').click()">Importar copia</button>
+      </div>
+      <input type="file" id="import-backup-input" accept="application/json" style="display:none" onchange="importarBackup(event)">
+    </div>
+    <div class="card">
+      <div class="section-title" style="margin-bottom:8px;">Datos guardados en este dispositivo</div>
+      <p class="muted" style="margin-bottom:10px;">Carpetas, documentos y clave se guardan solo en este navegador (IndexedDB/localStorage).</p>
+      <button class="removebtn" onclick="borrarTodo()">Borrar todo (carpetas, documentos y clave)</button>
+    </div>
+    <button class="btn btn-ghost" onclick="goto(previousMainScreen)">Volver</button>
+  </div>
+
+</div>
+
+<div class="fab-wrap">
+  <button class="fab" id="fab-camera" onclick="iniciarAnalisisNuevaCarpeta()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+    Analizar CUD
+  </button>
+</div>
+<div id="toast-container"></div>
+
+<script>
+/* =========================================================
+   ALMACENAMIENTO: localStorage (config) + IndexedDB (carpetas,
+   documentos y seguimiento). Todo standalone, solo en el
+   dispositivo donde se abre la app.
+   ========================================================= */
+const LS_CONFIG = 'lectorcud_config';
+function getConfig(){ try{ return JSON.parse(localStorage.getItem(LS_CONFIG)||'null'); }catch(e){ return null; } }
+function setConfig(cfg){ localStorage.setItem(LS_CONFIG, JSON.stringify(cfg)); }
+
+const DB_NAME='LectorCUD_DB', DB_VERSION=1;
+let _dbPromise = null;
+function openDB(){
+  if(_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e)=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains('carpetas')) db.createObjectStore('carpetas',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('documentos')){
+        const s = db.createObjectStore('documentos',{keyPath:'id'});
+        s.createIndex('carpetaId','carpetaId',{unique:false});
+      }
+      if(!db.objectStoreNames.contains('seguimiento')){
+        const s = db.createObjectStore('seguimiento',{keyPath:'id'});
+        s.createIndex('carpetaId','carpetaId',{unique:false});
+      }
+    };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+  return _dbPromise;
+}
+function dbPut(store, obj){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction(store,'readwrite');
+    tx.objectStore(store).put(obj);
+    tx.oncomplete = ()=>res(obj);
+    tx.onerror = ()=>rej(tx.error);
+  }));
+}
+function dbGetAll(store){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction(store,'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = ()=>res(req.result||[]);
+    req.onerror = ()=>rej(req.error);
+  }));
+}
+function dbGetByIndex(store, indexName, value){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction(store,'readonly');
+    const req = tx.objectStore(store).index(indexName).getAll(value);
+    req.onsuccess = ()=>res(req.result||[]);
+    req.onerror = ()=>rej(req.error);
+  }));
+}
+function dbGet(store, id){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction(store,'readonly');
+    const req = tx.objectStore(store).get(id);
+    req.onsuccess = ()=>res(req.result||null);
+    req.onerror = ()=>rej(req.error);
+  }));
+}
+function dbDelete(store, id){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction(store,'readwrite');
+    tx.objectStore(store).delete(id);
+    tx.oncomplete = ()=>res(true);
+    tx.onerror = ()=>rej(tx.error);
+  }));
+}
+function dbClearAll(){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction(['carpetas','documentos','seguimiento'],'readwrite');
+    tx.objectStore('carpetas').clear();
+    tx.objectStore('documentos').clear();
+    tx.objectStore('seguimiento').clear();
+    tx.oncomplete = ()=>res(true);
+    tx.onerror = ()=>rej(tx.error);
+  }));
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ---------- Migración liviana de la versión anterior (localStorage historial) ---------- */
+async function migrarHistorialAntiguoSiExiste(){
+  const carpetasActuales = await dbGetAll('carpetas');
+  if(carpetasActuales.length > 0) return;
+  const antiguos = [];
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('lectorcud_registro_')){
+      try{ antiguos.push(JSON.parse(localStorage.getItem(k))); }catch(e){}
+    }
+  }
+  for(const reg of antiguos){
+    const carpeta = { id: uid(), nombre: reg.nombre||'', dni: reg.dni||'', telefono:'', estado:'Vigente', createdAt: reg.timestamp||Date.now(), updatedAt: reg.timestamp||Date.now() };
+    await dbPut('carpetas', carpeta);
+    await dbPut('documentos', { id: uid(), carpetaId: carpeta.id, categoria:'Informe', nombreArchivo:'Informe CUD (migrado)', mimeType:'application/json', dataBase64:'', textoInforme: JSON.stringify(reg), fecha: carpeta.createdAt });
+    await dbPut('seguimiento', { id: uid(), carpetaId: carpeta.id, fecha: carpeta.createdAt, texto:'Carpeta creada automáticamente al migrar tu historial anterior.', estadoTramite:'Vigente' });
+  }
+}
+
+/* ---------- Navegación ---------- */
+let previousMainScreen = 'home';
+function goto(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const target = document.getElementById('screen-'+id);
+  if(target) target.classList.add('active');
+  if(id!=='settings') previousMainScreen = id;
+  document.getElementById('fab-camera').style.display = (id==='home') ? 'flex' : 'none';
+  if(id==='home') renderCarpetas();
+  if(id==='settings'){
+    const cfg = getConfig() || {};
+    document.getElementById('set-apikey').value = cfg.apiKey || '';
+    document.getElementById('set-model').value = cfg.model || 'gemini-3.5-flash';
+    document.getElementById('set-email').value = cfg.email || 'drluismuratori@gmail.com';
+    document.getElementById('set-doctor-nombre').value = cfg.doctorNombre || 'Dr. Luis Muratori';
+    document.getElementById('set-doctor-matricula').value = cfg.doctorMatricula || '';
+    const modo = cfg.modo || 'independiente';
+    document.querySelectorAll('input[name=modo]').forEach(r=>r.checked = (r.value===modo));
+    document.getElementById('set-backend-url').value = cfg.backendUrl || '';
+    document.getElementById('set-backend-token').value = cfg.backendToken || '';
+    onModoChange();
+  }
+  window.scrollTo(0,0);
+}
+function onModoChange(){
+  const sel = document.querySelector('input[name=modo]:checked');
+  const modo = sel ? sel.value : 'independiente';
+  document.getElementById('conectado-fields').classList.toggle('hidden', modo!=='conectado');
+}
+function toast(msg){
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div'); el.className='toast'; el.textContent = msg;
+  c.appendChild(el); setTimeout(()=>el.remove(), 3400);
+}
+function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- Setup / Config ---------- */
+function saveConfig(fromSettings){
+  const prefix = fromSettings ? 'set-' : 'input-';
+  const apiKey = document.getElementById(prefix+'apikey').value.trim();
+  const model = document.getElementById(prefix+'model').value;
+  const email = document.getElementById(prefix+'email').value.trim();
+  if(!apiKey){ toast('Ingresá tu clave de Gemini'); return; }
+  const cfg = { apiKey, model, email, modo:'independiente', backendUrl:'', backendToken:'', doctorNombre:'Dr. Luis Muratori', doctorMatricula:'' };
+  if(fromSettings){
+    const sel = document.querySelector('input[name=modo]:checked');
+    cfg.modo = sel ? sel.value : 'independiente';
+    cfg.backendUrl = document.getElementById('set-backend-url').value.trim();
+    cfg.backendToken = document.getElementById('set-backend-token').value.trim();
+    cfg.doctorNombre = document.getElementById('set-doctor-nombre').value.trim() || 'Dr. Luis Muratori';
+    cfg.doctorMatricula = document.getElementById('set-doctor-matricula').value.trim();
+  }
+  setConfig(cfg);
+  toast('Configuración guardada');
+  goto('home');
+}
+async function borrarTodo(){
+  if(!confirm('¿Borrar TODAS las carpetas, documentos, seguimiento y la clave guardada en este dispositivo? No se puede deshacer.')) return;
+  localStorage.removeItem(LS_CONFIG);
+  await dbClearAll();
+  toast('Borrado');
+  goto('setup');
+}
+
+/* ---------- Copia de seguridad completa (exportar/importar) ---------- */
+async function exportarBackup(){
+  const [carpetas, documentos, seguimiento] = await Promise.all([
+    dbGetAll('carpetas'), dbGetAll('documentos'), dbGetAll('seguimiento')
+  ]);
+  const backup = {
+    version: 1,
+    exportadoEl: new Date().toISOString(),
+    carpetas, documentos, seguimiento
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const fecha = new Date().toISOString().slice(0,10);
+  downloadBlob(blob, `Backup_LectorCUD_${fecha}.json`);
+  toast('Copia de seguridad descargada');
+}
+async function importarBackup(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  try{
+    const texto = await file.text();
+    const backup = JSON.parse(texto);
+    if(!backup || !Array.isArray(backup.carpetas)){ toast('El archivo no tiene el formato esperado'); return; }
+    if(!confirm(`Se importarán ${backup.carpetas.length} carpeta(s). Los registros con el mismo ID se sobrescriben. ¿Continuar?`)) return;
+    for(const c of backup.carpetas) await dbPut('carpetas', c);
+    for(const d of (backup.documentos||[])) await dbPut('documentos', d);
+    for(const s of (backup.seguimiento||[])) await dbPut('seguimiento', s);
+    toast('Copia importada correctamente');
+    goto('home');
+  }catch(e){
+    console.error(e);
+    toast('No se pudo leer el archivo de copia de seguridad');
+  }
+}
+
+/* ---------- Agenda (home): buscar y listar carpetas ---------- */
+async function renderCarpetas(){
+  const list = document.getElementById('carpetas-list');
+  const q = (document.getElementById('search-box').value||'').trim().toLowerCase();
+  let carpetas = await dbGetAll('carpetas');
+  carpetas.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  if(q){
+    carpetas = carpetas.filter(c => (c.nombre||'').toLowerCase().includes(q) || (c.dni||'').toLowerCase().includes(q));
+  }
+  if(carpetas.length===0){
+    list.innerHTML = '<div class="empty"><div class="glyph">🗂️</div>'+(q? 'No se encontraron carpetas para esa búsqueda.' : 'Todavía no hay carpetas.<br>Tocá "Analizar CUD" para crear la primera.')+'</div>';
+    return;
+  }
+  list.innerHTML = carpetas.map(c=>{
+    const chipClass = c.estado==='Finalizado' ? 'done' : (c.estado==='Documentación incompleta' ? 'warn' : '');
+    return `<div class="hist-item" onclick="abrirCarpeta('${c.id}')">
+      <div>
+        <div class="name">${escapeHtml(c.nombre || 'Sin nombre')}</div>
+        <div class="sub">DNI ${escapeHtml(c.dni||'-')}${c.telefono? ' · '+escapeHtml(c.telefono):''}</div>
+      </div>
+      <span class="chip ${chipClass}">${escapeHtml(c.estado||'Vigente')}</span>
+    </div>`;
+  }).join('');
+}
+
+async function encontrarCarpetaPorDni(dni){
+  if(!dni) return null;
+  const todas = await dbGetAll('carpetas');
+  return todas.find(c => c.dni && c.dni === dni) || null;
+}
+
+/* ---------- Captura: contexto compartido (analizar CUD nuevo / agregar documento) ---------- */
+let captureContext = { mode:'analyze', carpetaId:null, categoria:'CUD', returnTo:'home' };
+let currentImageBase64 = null;
+let currentImageMime = null;
+let currentFileName = null;
+
+function iniciarAnalisisNuevaCarpeta(){
+  captureContext = { mode:'analyze', carpetaId:null, categoria:'CUD', returnTo:'home' };
+  document.getElementById('capture-title').textContent = 'Analizar CUD';
+  document.getElementById('btn-analyze').textContent = 'Analizar con Gemini';
+  resetCaptureUI();
+  goto('capture');
+}
+function analizarNuevoCudParaCarpeta(){
+  captureContext = { mode:'analyze', carpetaId: currentCarpetaId, categoria:'CUD', returnTo:'carpeta' };
+  document.getElementById('capture-title').textContent = 'Leer nuevo CUD para esta carpeta';
+  document.getElementById('btn-analyze').textContent = 'Analizar con Gemini';
+  resetCaptureUI();
+  goto('capture');
+}
+function abrirAgregarDocumento(){
+  const catSel = document.querySelector('#add-doc-catpicker .cat.sel');
+  const categoria = catSel ? catSel.getAttribute('data-cat') : 'Aportado';
+  captureContext = { mode:'adddoc', carpetaId: currentCarpetaId, categoria, returnTo:'carpeta' };
+  document.getElementById('capture-title').textContent = 'Agregar documento (' + categoria + ')';
+  document.getElementById('btn-analyze').textContent = 'Guardar documento en la carpeta';
+  resetCaptureUI();
+  goto('capture');
+}
+function selectAddDocCat(el){
+  document.querySelectorAll('#add-doc-catpicker .cat').forEach(e=>e.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function resetCaptureUI(){
+  document.getElementById('preview-area').innerHTML = '';
+  document.getElementById('btn-analyze').disabled = true;
+  currentImageBase64 = null; currentImageMime = null; currentFileName = null;
+}
+
+/* Compresión de imágenes para acelerar el análisis y ahorrar espacio */
+function resizeImageDataUrl(dataUrl, maxDim, quality){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        if(w>h){ h = Math.round(h * maxDim / w); w = maxDim; } else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = ()=>resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function onFileSelected(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  currentFileName = file.name;
+  let mime = file.type || (ev.target.id==='file-pdf' ? 'application/pdf' : 'image/jpeg');
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    let dataUrl = e.target.result;
+    if(mime !== 'application/pdf'){
+      dataUrl = await resizeImageDataUrl(dataUrl, 1600, 0.82);
+      mime = 'image/jpeg';
+    }
+    currentImageMime = mime;
+    currentImageBase64 = dataUrl.split(',')[1];
+    const preview = document.getElementById('preview-area');
+    if(mime === 'application/pdf'){
+      preview.innerHTML = `<div class="preview-box"><span class="pdf-chip">📄 ${escapeHtml(file.name)}</span></div>`;
+    }else{
+      preview.innerHTML = `<div class="preview-box"><img src="${dataUrl}" alt="documento"><p class="faint" style="margin-top:8px;">Si no se ve nítida, elegí otra.</p></div>`;
+    }
+    document.getElementById('btn-analyze').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function onCaptureConfirm(){
+  if(captureContext.mode === 'analyze'){
+    await analyzeImage();
+  }else{
+    await guardarDocumentoDirecto();
+  }
+}
+
+async function guardarDocumentoDirecto(){
+  if(!currentImageBase64){ toast('Elegí primero un archivo'); return; }
+  let carpetaId = captureContext.carpetaId;
+  if(!carpetaId){ toast('No hay una carpeta seleccionada'); return; }
+  const doc = {
+    id: uid(), carpetaId, categoria: captureContext.categoria,
+    nombreArchivo: currentFileName || (captureContext.categoria+'.jpg'),
+    mimeType: currentImageMime, dataBase64: currentImageBase64, fecha: Date.now()
+  };
+  await dbPut('documentos', doc);
+  await dbPut('seguimiento', { id: uid(), carpetaId, fecha: Date.now(), texto: `Se agregó un documento: ${captureContext.categoria} (${doc.nombreArchivo}).`, estadoTramite: null });
+  const carpeta = await dbGet('carpetas', carpetaId);
+  if(carpeta){ carpeta.updatedAt = Date.now(); await dbPut('carpetas', carpeta); }
+  toast('Documento guardado en la carpeta');
+  goto('carpeta');
+}
+
+/* ----------------------------------------------------------------
+   Base de conocimiento: Ley 22.431 + directivas SENADIS
+   ---------------------------------------------------------------- */
+const CMO_ITEM = 'Certificado Médico Obligatorio (CMO), emitido por el especialista tratante, con diagnóstico completo y descripción del estado funcional, firma y sello legibles — antigüedad no mayor a 6 meses';
+const ESTUDIOS_COMUNES = [
+  CMO_ITEM,
+  'Estudios complementarios que avalen el diagnóstico (originales y copia), con antigüedad no mayor a 12 meses',
+  'DNI vigente con domicilio actualizado, original y fotocopia (del titular y, si corresponde, del tutor/representante legal)',
+  'Si es renovación: presentar el CUD anterior (original), vencido o próximo a vencer',
+  'Planilla específica descargada del sitio oficial según el tipo de discapacidad, completada y firmada por el médico especialista tratante'
+];
+const ESTUDIOS_POR_TIPO = {
+  'Motora / física': { especificos:['Informe traumatológico y/o neurológico actualizado que describa la deficiencia motora','Estudios de imagen según patología: radiografías, RMN, TAC o electromiograma'], normativa:'Normativa SENADIS para la evaluación de personas con discapacidad con deficiencia física de origen motor' },
+  'Sensorial - Visual': { especificos:['Informe oftalmológico con agudeza visual y campo visual','Planilla específica de discapacidad visual firmada por oftalmólogo'], normativa:'Normativa SENADIS para la certificación de personas con discapacidad con deficiencia sensorial de origen visual' },
+  'Sensorial - Auditiva': { especificos:['Audiometría tonal y logoaudiometría actualizadas','Informe de otorrinolaringología'], normativa:'Normativa SENADIS para la certificación de personas con discapacidad auditiva' },
+  'Mental - Intelectual': { especificos:['Informe psicológico/psicopedagógico con evaluación de coeficiente intelectual y perfil de funcionamiento','Resumen de historia clínica del especialista tratante'], normativa:'Normativa SENADIS para la certificación de personas con discapacidad con deficiencia intelectual y mental' },
+  'Mental - Psicosocial': { especificos:['Informe psiquiátrico actualizado o resumen de historia clínica','Descripción del perfil de funcionamiento psicosocial'], normativa:'Normativa SENADIS para la certificación de personas con discapacidad con deficiencia intelectual y mental (incluye salud mental)' },
+  'Visceral': { especificos:['Estudios específicos del órgano/sistema comprometido (función renal, ecografías, espirometría, estudios cardiológicos u oncológicos, según corresponda)','Informe del especialista tratante del órgano/sistema afectado'], normativa:'Normativa SENADIS para la certificación de personas con discapacidad con deficiencia física de origen visceral' },
+  'Mixta': { especificos:['Estudios complementarios correspondientes a cada tipo de discapacidad involucrada','Informe de cada especialista tratante interviniente, con planilla específica por cada tipo'], normativa:'Se combinan las normativas SENADIS correspondientes a cada tipo de discapacidad presente' }
+};
+function onTipoChange(){ renderStudies(document.getElementById('f-tipo').value); renderPrestaciones(document.getElementById('f-tipo').value); }
+function renderStudies(tipo){
+  const info = ESTUDIOS_POR_TIPO[tipo] || ESTUDIOS_POR_TIPO['Motora / física'];
+  const list = ESTUDIOS_COMUNES.concat(info.especificos);
+  document.getElementById('studies-list').innerHTML = list.map(s=>`<li>${escapeHtml(s)}</li>`).join('');
+  document.getElementById('studies-refs').innerHTML = `Referencia: ${escapeHtml(info.normativa)} · <a href="https://www.argentina.gob.ar/servicio/como-obtener-el-certificado-unico-de-discapacidad-cud" target="_blank" rel="noopener">ver trámite oficial en argentina.gob.ar</a>`;
+}
+
+/* ----------------------------------------------------------------
+   Prestaciones adquiridas con el CUD y su cobertura
+   Base: Ley 22.431 (beneficios generales) y Ley 24.901 (prestaciones
+   básicas de habilitación/rehabilitación, cobertura 100% a cargo de
+   obra social/prepaga, o del Estado si el/la paciente carece de ella).
+   ---------------------------------------------------------------- */
+const PRESTACIONES_COMUNES = [
+  'Cobertura del 100% en tratamientos, medicamentos y rehabilitación vinculados al diagnóstico certificado, a cargo de la obra social o prepaga (Ley 24.901, art. 2°) o, en su defecto, del Estado (Ley 22.431, art. 4°, texto según Ley 24.901)',
+  'Transporte público terrestre gratuito de corta, media y larga distancia (colectivos, trenes y micros)',
+  'Símbolo Internacional de Acceso, para estacionar en los espacios reservados',
+  'Asignaciones familiares por hijo/a o cónyuge con discapacidad, cuando corresponda (ANSES)',
+  'Exenciones impositivas: patentes y determinados tributos municipales/provinciales'
+];
+const PRESTACIONES_POR_TIPO = {
+  'Motora / física': ['Rehabilitación kinésica y fisiátrica','Provisión de órtesis, prótesis y ayudas técnicas (bastones, sillas de ruedas, andadores) según prescripción médica','Transporte especial o traslados para tratamiento cuando la movilidad lo requiera'],
+  'Sensorial - Visual': ['Rehabilitación visual y provisión de ayudas ópticas o no ópticas','Apoyo para la accesibilidad (materiales en sistema Braille o macrotipo, según corresponda)'],
+  'Sensorial - Auditiva': ['Provisión de audífonos o implantes y su mantenimiento','Rehabilitación fonoaudiológica','Intérprete de Lengua de Señas Argentina (LSA), cuando se requiera para trámites o educación'],
+  'Mental - Intelectual': ['Prestaciones educativas especiales y apoyo a la integración escolar','Rehabilitación psicopedagógica','Centro de día o talleres protegidos, según el proyecto de vida de la persona'],
+  'Mental - Psicosocial': ['Tratamiento psiquiátrico y psicoterapéutico','Hospital de día o dispositivos de rehabilitación psicosocial, cuando estén indicados','Atención especializada domiciliaria si la situación clínica lo requiere (Ley 24.901, art. 34)'],
+  'Visceral': ['Tratamiento y seguimiento del órgano/sistema comprometido, incluyendo medicación específica','Provisión de insumos o dispositivos vinculados (por ejemplo, elementos de ostomía, oxígeno domiciliario, según el caso)'],
+  'Mixta': ['Combinación de las prestaciones correspondientes a cada tipo de discapacidad presente, coordinadas por el equipo tratante']
+};
+function renderPrestaciones(tipo){
+  const especificas = PRESTACIONES_POR_TIPO[tipo] || PRESTACIONES_POR_TIPO['Motora / física'];
+  const list = PRESTACIONES_COMUNES.concat(especificas);
+  const el = document.getElementById('prestaciones-list');
+  if(el) el.innerHTML = list.map(s=>`<li>${escapeHtml(s)}</li>`).join('');
+}
+function listaPrestaciones(tipo){
+  const especificas = PRESTACIONES_POR_TIPO[tipo] || PRESTACIONES_POR_TIPO['Motora / física'];
+  return PRESTACIONES_COMUNES.concat(especificas);
+}
+
+/* ---------- Efectores probables (Mendoza) y trazabilidad: valores por defecto editables ---------- */
+function defaultEfectores(){
+  return `El efector concreto depende de la cobertura de salud del/de la paciente:
+- Con obra social o prepaga: los prestadores habilitados figuran en la cartilla vigente de dicha entidad.
+- Afiliación a OSEP: empadronamiento en la Dirección de Discapacidad de OSEP (Edificio Xeltahuina, Salta 877, Ciudad de Mendoza; discapacidad_osep@osep.mendoza.gov.ar) para acceder a los prestadores convenidos.
+- Sin cobertura de obra social: red pública provincial (hospital de cabecera y Programa de Rehabilitación Basada en la Comunidad, de la Dirección de Atención a las Personas con Discapacidad — Subsecretaría de Salud de Mendoza), en articulación con la Junta Evaluadora departamental.
+Se recomienda confirmar el efector puntual con la obra social o el área de discapacidad correspondiente antes de iniciar el tratamiento.`;
+}
+function defaultTrazabilidad(){
+  return `Completar si corresponde: detallar qué prestaciones no se encuentran cubiertas por la obra social, prepaga o el sistema público del/de la paciente, y que motivaron la gestión de la prestación económica (contributiva o no contributiva) vinculada a esta discapacidad, a fin de documentar la trazabilidad del aporte recibido ante eventuales auditorías del organismo otorgante.`;
+}
+const PENSION_EXPLICACION = `El Retiro por Invalidez es una prestación previsional contributiva (Ley 24.241, arts. 48 a 55): exige acreditar una incapacidad laboral del 66% o más junto con aportes previsionales regulares al SIPA. La Pensión No Contributiva por Invalidez, en cambio, no exige aportes previsionales previos: requiere el mismo porcentaje de incapacidad (66% o más) y la comprobación de vulnerabilidad socioeconómica (ausencia de ingresos suficientes y de cualquier otra jubilación, pensión o retiro). Ambas prestaciones están sujetas a auditorías periódicas obligatorias por parte del organismo otorgante.`;
+
+/* ----------------------------------------------------------------
+   Diccionario CIF (Clasificación Internacional del Funcionamiento)
+   Traducción de los códigos que aparecen en el CUD a lenguaje claro.
+   Cubre los códigos más frecuentes; si aparece uno no incluido, se
+   avisa en vez de inventar un significado.
+   ---------------------------------------------------------------- */
+const CIF_DICCIONARIO = {
+  // Funciones corporales (b)
+  'b110':'Funciones de la conciencia','b114':'Funciones de la orientación','b117':'Funciones intelectuales',
+  'b126':'Funciones del temperamento y la personalidad','b130':'Funciones de la energía y los impulsos',
+  'b134':'Funciones del sueño','b140':'Funciones de la atención','b144':'Funciones de la memoria',
+  'b152':'Funciones emocionales','b156':'Funciones de la percepción','b160':'Funciones del pensamiento',
+  'b164':'Funciones cognitivas superiores','b167':'Funciones mentales del lenguaje','b172':'Funciones del cálculo',
+  'b176':'Funciones mentales de secuenciación de movimientos complejos','b180':'Funciones de la experiencia de uno mismo y del tiempo',
+  'b210':'Funciones visuales','b215':'Funciones de las estructuras anexas al ojo','b230':'Funciones auditivas',
+  'b235':'Funciones vestibulares','b240':'Sensaciones asociadas a la audición y funciones vestibulares',
+  'b250':'Funciones gustativas','b260':'Funciones propioceptivas','b265':'Funciones táctiles',
+  'b270':'Funciones sensoriales relacionadas con la temperatura y otros estímulos','b280':'Sensación de dolor',
+  'b310':'Funciones de la voz','b320':'Funciones de la articulación verbal','b330':'Funciones de la fluidez y ritmo del habla',
+  'b410':'Funciones cardíacas','b415':'Funciones de los vasos sanguíneos','b420':'Funciones de la presión arterial',
+  'b430':'Funciones hematológicas','b435':'Funciones del sistema inmunológico','b440':'Funciones respiratorias',
+  'b445':'Funciones musculares respiratorias','b450':'Funciones respiratorias adicionales',
+  'b455':'Funciones relacionadas con la tolerancia al ejercicio','b510':'Funciones de la ingestión',
+  'b515':'Funciones digestivas','b525':'Funciones de defecación','b530':'Funciones de mantenimiento del peso',
+  'b535':'Sensaciones asociadas al sistema digestivo','b540':'Funciones metabólicas generales',
+  'b545':'Funciones de equilibrio hídrico, mineral y electrolítico','b555':'Funciones de las glándulas endocrinas',
+  'b610':'Funciones de excreción urinaria','b620':'Funciones urinarias adicionales','b630':'Funciones reproductoras',
+  'b640':'Funciones sexuales','b710':'Funciones relacionadas con la movilidad de las articulaciones',
+  'b715':'Funciones relacionadas con la estabilidad de las articulaciones','b720':'Funciones relacionadas con la movilidad de los huesos',
+  'b730':'Funciones relacionadas con la fuerza muscular','b735':'Funciones relacionadas con el tono muscular',
+  'b740':'Funciones relacionadas con la resistencia muscular','b750':'Funciones relacionadas con los reflejos motores',
+  'b755':'Funciones relacionadas con las reacciones motoras involuntarias','b760':'Funciones relacionadas con el control de los movimientos voluntarios',
+  'b770':'Funciones relacionadas con el patrón de la marcha','b780':'Sensaciones relacionadas con los músculos y funciones del movimiento',
+  'b810':'Funciones protectoras de la piel','b820':'Funciones reparadoras de la piel',
+  // Estructuras corporales (s)
+  's110':'Estructura del cerebro','s120':'Estructura de la médula espinal y estructuras relacionadas',
+  's130':'Estructura de las meninges','s210':'Estructura de la órbita ocular','s220':'Estructura del globo ocular',
+  's230':'Estructuras anexas al ojo','s240':'Estructura del oído externo','s250':'Estructura del oído medio',
+  's260':'Estructura del oído interno','s310':'Estructura de la nariz','s320':'Estructura de la boca',
+  's330':'Estructura de la faringe','s340':'Estructura de la laringe','s410':'Estructura del sistema cardiovascular',
+  's420':'Estructura del sistema inmunológico','s430':'Estructura del sistema respiratorio',
+  's510':'Estructura de las glándulas salivales','s520':'Estructura del esófago','s530':'Estructura del estómago',
+  's540':'Estructura del intestino','s550':'Estructura del páncreas','s560':'Estructura del hígado',
+  's570':'Estructura de la vesícula biliar y conductos','s580':'Estructura de las glándulas endocrinas',
+  's610':'Estructura del sistema urinario','s620':'Estructura del suelo pélvico','s630':'Estructura del sistema reproductor',
+  's710':'Estructura de la cabeza y el cuello','s720':'Estructura de la región del hombro','s730':'Estructura del miembro superior',
+  's740':'Estructura de la región pélvica','s750':'Estructura del miembro inferior','s760':'Estructura del tronco (columna, tórax y pelvis)',
+  's770':'Estructuras musculoesqueléticas adicionales relacionadas con el movimiento','s810':'Estructura de las áreas de la piel',
+  // Actividades y participación (d)
+  'd110':'Mirar','d115':'Escuchar','d140':'Aprender a leer','d145':'Aprender a escribir','d150':'Aprender a calcular',
+  'd155':'Adquisición de habilidades','d160':'Dirigir la atención','d163':'Pensar','d166':'Leer','d170':'Escribir',
+  'd172':'Calcular','d175':'Resolver problemas','d177':'Tomar decisiones','d210':'Llevar a cabo una única tarea',
+  'd220':'Llevar a cabo múltiples tareas','d230':'Llevar a cabo la rutina diaria','d240':'Manejo del estrés y otras demandas psicológicas',
+  'd310':'Comunicación: recepción de mensajes hablados','d315':'Comunicación: recepción de mensajes no verbales',
+  'd330':'Hablar','d335':'Producción de mensajes no verbales','d350':'Conversación',
+  'd360':'Utilización de dispositivos y técnicas de comunicación','d410':'Cambiar las posturas corporales básicas',
+  'd415':'Mantenimiento de la posición del cuerpo','d420':'Transferir el propio cuerpo','d430':'Levantar y llevar objetos',
+  'd435':'Mover objetos con las extremidades inferiores','d440':'Uso fino de la mano','d445':'Uso de la mano y el brazo',
+  'd450':'Andar (caminar)','d455':'Desplazarse (correr, trepar, saltar)','d460':'Desplazarse por distintos lugares',
+  'd465':'Desplazarse utilizando algún tipo de equipamiento','d470':'Utilización de medios de transporte','d475':'Conducir',
+  'd480':'Montar animales para transporte','d510':'Lavarse','d520':'Cuidado de partes del cuerpo',
+  'd530':'Cuidados relacionados con los procesos de excreción','d540':'Vestirse','d550':'Comer','d560':'Beber',
+  'd570':'Cuidado de la propia salud','d610':'Adquisición de vivienda','d620':'Adquisición de bienes y servicios',
+  'd630':'Preparación de comidas','d640':'Realización de los quehaceres del hogar','d650':'Cuidado de los objetos del hogar',
+  'd660':'Ayudar a otros','d710':'Interacciones interpersonales básicas','d720':'Interacciones interpersonales complejas',
+  'd730':'Relacionarse con extraños','d740':'Relaciones formales','d750':'Relaciones sociales informales',
+  'd760':'Relaciones familiares','d770':'Relaciones íntimas','d810':'Educación informal','d820':'Educación escolar',
+  'd830':'Educación superior','d850':'Trabajo remunerado','d855':'Trabajo no remunerado',
+  'd860':'Transacciones económicas básicas','d870':'Autosuficiencia económica','d910':'Vida comunitaria',
+  'd845':'Conseguir, mantener y finalizar un trabajo',
+  'd920':'Recreación y ocio','d930':'Religión y espiritualidad','d940':'Derechos humanos',
+  // Factores ambientales (e)
+  'e110':'Productos o sustancias para el consumo personal (alimentos, medicamentos)',
+  'e115':'Productos y tecnología para uso personal en la vida diaria',
+  'e120':'Productos y tecnología para la movilidad y el transporte personal',
+  'e125':'Productos y tecnología para la comunicación','e130':'Productos y tecnología para la educación',
+  'e135':'Productos y tecnología para el empleo','e140':'Productos y tecnología para actividades culturales, recreativas y deportivas',
+  'e150':'Diseño y construcción de edificios de uso público','e155':'Diseño y construcción de edificios de uso privado',
+  'e160':'Productos y tecnología de terrenos','e210':'Geografía física','e225':'Clima',
+  'e310':'Familiares cercanos','e315':'Otros familiares','e320':'Amigos',
+  'e325':'Conocidos, compañeros, vecinos y miembros de la comunidad','e330':'Personas en cargos de autoridad',
+  'e340':'Cuidadores y personal de ayuda','e355':'Profesionales de la salud','e360':'Otros profesionales',
+  'e410':'Actitudes individuales de los familiares cercanos','e420':'Actitudes individuales de amigos',
+  'e440':'Actitudes individuales de cuidadores y personal de ayuda','e450':'Actitudes individuales de profesionales de la salud',
+  'e460':'Actitudes sociales','e465':'Normas, prácticas e ideologías sociales',
+  'e535':'Servicios, sistemas y políticas de comunicación','e540':'Servicios, sistemas y políticas de transporte',
+  'e550':'Servicios, sistemas y políticas legales','e560':'Servicios, sistemas y políticas de medios de comunicación','e570':'Servicios, sistemas y políticas de seguridad social',
+  'e575':'Servicios, sistemas y políticas de apoyo social general','e580':'Servicios, sistemas y políticas sanitarias',
+  'e585':'Servicios, sistemas y políticas de educación y formación','e590':'Servicios, sistemas y políticas laborales y de empleo'
+};
+/* Escala genérica de calificadores CIF (gravedad del problema / barrera-facilitador) */
+const QUALIF_SCALE = {
+  '0':'Ninguna dificultad / problema (0–4%)', '1':'Dificultad LEVE (5–24%)',
+  '2':'Dificultad MODERADA (25–49%)', '3':'Dificultad GRAVE (50–95%)',
+  '4':'Dificultad COMPLETA (96–100%)', '8':'No especificado', '9':'No aplicable'
+};
+/* 2do calificador de Estructuras Corporales: naturaleza del cambio */
+const QUALIF_NATURALEZA = {
+  '0':'sin cambio en la estructura','1':'ausencia total','2':'ausencia parcial','3':'parte adicional',
+  '4':'dimensiones aberrantes','5':'discontinuidad','6':'posición desviada',
+  '7':'cambios cualitativos (incluye acumulación de líquido)','8':'no especificado','9':'no aplicable'
+};
+/* 3er calificador de Estructuras Corporales: localización */
+const QUALIF_LOCALIZACION = {
+  '0':'más de una región','1':'derecha','2':'izquierda','3':'ambos lados','4':'parte anterior',
+  '5':'parte posterior','6':'proximal','7':'distal','8':'no especificado','9':'no aplicable'
+};
+function decodeQualifier(letter, qualifierStr){
+  if(!qualifierStr) return null;
+  const esFacilitador = qualifierStr.indexOf('+') !== -1;
+  const digits = qualifierStr.replace('+','').split('').filter(d=>/[0-9]/.test(d));
+  if(digits.length===0) return null;
+  if(letter==='e'){
+    const base = QUALIF_SCALE[digits[0]] || 'valor no estándar';
+    return esFacilitador ? `Facilitador — grado: ${base.replace(/^Dificultad /,'').replace(/^Ninguna dificultad \/ problema/,'sin efecto relevante')}` : `Barrera — ${base}`;
+  }
+  if(letter==='d'){
+    if(digits.length>=2){
+      return `Desempeño/Realización: ${QUALIF_SCALE[digits[0]]||'valor no estándar'} · Capacidad: ${QUALIF_SCALE[digits[1]]||'valor no estándar'}`;
+    }
+    return QUALIF_SCALE[digits[0]] || 'valor no estándar';
+  }
+  if(letter==='s'){
+    let out = `Magnitud del problema: ${QUALIF_SCALE[digits[0]]||'valor no estándar'}`;
+    if(digits[1]) out += ` · Naturaleza del cambio: ${QUALIF_NATURALEZA[digits[1]]||'valor no estándar'}`;
+    if(digits[2]) out += ` · Localización: ${QUALIF_LOCALIZACION[digits[2]]||'valor no estándar'}`;
+    return out;
+  }
+  return QUALIF_SCALE[digits[0]] || 'valor no estándar'; // b
+}
+function traducirCodigosCif(cadena){
+  if(!cadena) return [];
+  const tokens = cadena.split(/[\s,;·]+/).map(t=>t.trim()).filter(Boolean);
+  const vistos = new Set();
+  const resultado = [];
+  tokens.forEach(tok=>{
+    if(vistos.has(tok)) return;
+    const parts = tok.split('.');
+    const codePart = parts[0];
+    const m = codePart.match(/^([bdse])[\.\-]?(\d{3})/i);
+    if(!m) return;
+    vistos.add(tok);
+    const letter = m[1].toLowerCase();
+    const base = letter + m[2];
+    const desc = CIF_DICCIONARIO[base] || 'Código CIF específico no incluido en este diccionario simplificado (consultar el manual completo de la CIF-OMS)';
+    let calificador = null;
+    if(parts.length>1){
+      calificador = decodeQualifier(letter, parts[parts.length-1]);
+    }
+    resultado.push({ codigo: tok, descripcion: desc, calificador });
+  });
+  return resultado;
+}
+function renderGlosarioCodigos(){
+  const cadena = document.getElementById('f-codigos').value;
+  const items = traducirCodigosCif(cadena);
+  const el = document.getElementById('codigos-glosario');
+  if(!el) return;
+  if(items.length===0){ el.innerHTML = '<p class="faint">Ingresá los códigos CIF arriba para ver su traducción.</p>'; return; }
+  el.innerHTML = '<ul class="studies-list">' + items.map(it=>
+    `<li><b>${escapeHtml(it.codigo)}</b>: ${escapeHtml(it.descripcion)}${it.calificador ? '<br><span class="faint">Sub-clasificación: '+escapeHtml(it.calificador)+'</span>' : ''}</li>`
+  ).join('') + '</ul>';
+}
+
+/* ---------- Firmantes dinámicos ---------- */
+function addFirmante(nombre, matricula, especialidad){
+  const wrap = document.getElementById('firmantes-list');
+  const row = document.createElement('div'); row.className = 'signer-row'; row.style.marginBottom = '8px';
+  row.innerHTML = `<input type="text" placeholder="Nombre" value="${escapeHtml(nombre)}" class="firmante-nombre">
+    <input type="text" placeholder="Matrícula" value="${escapeHtml(matricula)}" class="firmante-matricula">
+    <input type="text" placeholder="Especialidad" value="${escapeHtml(especialidad)}" class="firmante-especialidad">`;
+  wrap.appendChild(row);
+}
+function getFirmantes(){
+  const rows = document.querySelectorAll('#firmantes-list .signer-row');
+  return Array.from(rows).map(r=>({
+    nombre: r.querySelector('.firmante-nombre').value.trim(),
+    matricula: r.querySelector('.firmante-matricula').value.trim(),
+    especialidad: r.querySelector('.firmante-especialidad').value.trim()
+  })).filter(f=>f.nombre || f.matricula || f.especialidad);
+}
+
+/* Reintenta automáticamente si Gemini responde 503 (alta demanda) o 429 (límite de uso),
+   con espera creciente entre intentos. Evita que el usuario tenga que repetir todo a mano. */
+async function fetchGeminiConReintento(cfg, mimeType, base64Data, promptText, intentos){
+  intentos = intentos || 3;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model||'gemini-3.5-flash'}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
+  const body = JSON.stringify({
+    contents:[{ parts:[ {inline_data:{mime_type: mimeType, data: base64Data}}, {text: promptText} ] }],
+    generationConfig:{ responseMimeType:'application/json', temperature: 0.1 }
+  });
+  let ultimoError = null;
+  for(let intento=1; intento<=intentos; intento++){
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body });
+    if(res.ok) return res;
+    const esperar = (res.status===503 || res.status===429);
+    const errText = await res.text();
+    ultimoError = new Error('Gemini respondió ' + res.status + ': ' + errText.slice(0,200));
+    if(!esperar || intento===intentos) throw ultimoError;
+    document.getElementById('analyzing-text').textContent = `Los servidores de Gemini están saturados, reintentando (${intento}/${intentos-1})…`;
+    await new Promise(r=>setTimeout(r, 2500 * intento));
+  }
+  throw ultimoError;
+}
+
+/* ---------- Llamada a Gemini (imagen o PDF) ---------- */
+async function analyzeImage(){
+  const cfg = getConfig();
+  if(!cfg || !cfg.apiKey){ toast('Falta configurar tu clave de Gemini'); goto('setup'); return; }
+  if(!currentImageBase64){ toast('Primero elegí una foto o un PDF'); return; }
+  goto('analyzing');
+  document.getElementById('analyzing-text').textContent = 'Leyendo el certificado con Gemini…';
+
+  const prompt = `Sos un asistente médico-administrativo especializado en Certificados Únicos de Discapacidad (CUD) de Argentina.
+Vas a recibir la foto o el PDF de un CUD. Transcribí y estructurá TODOS los datos visibles.
+
+MARCO NORMATIVO DE REFERENCIA (Ley 22.431, arts. 2 y 3, actualizada por Ley 27.793):
+- El CUD acredita discapacidad por deficiencias físicas, mentales, intelectuales o sensoriales de largo plazo.
+- Categorías posibles (usá EXACTAMENTE una de estas etiquetas para "tipo_discapacidad"): "Motora / física", "Sensorial - Visual", "Sensorial - Auditiva", "Mental - Intelectual", "Mental - Psicosocial", "Visceral", "Mixta".
+- El organismo rector es la Secretaría Nacional de Discapacidad (SENADIS), dependiente del Ministerio de Salud, que absorbió las funciones de la ex ANDIS (disuelta); esto no afecta la validez de certificados ya emitidos.
+
+Devolvé EXCLUSIVAMENTE un JSON válido (sin texto adicional, sin markdown, sin backticks) con esta estructura exacta:
+{
+  "nombre": "", "dni": "", "fecha_nacimiento": "", "diagnostico": "", "codigos": "",
+  "tipo_discapacidad": "", "subtipo": "", "modalidad": "", "orientacion_prestacion": "",
+  "fecha_emision": "", "fecha_vencimiento": "", "junta": "",
+  "firmantes": [{"nombre":"","matricula":"","especialidad":""}]
+}
+Si un dato no es legible o no figura, usá "No consta en la imagen". NUNCA inventes un dato que no esté en el documento.`;
+
+  try{
+    const res = await fetchGeminiConReintento(cfg, currentImageMime, currentImageBase64, prompt);
+    const data = await res.json();
+    const textOut = data?.candidates?.[0]?.content?.parts?.map(p=>p.text).join('') || '';
+    let clean = textOut.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+    const parsed = JSON.parse(clean);
+
+    let carpeta = null;
+    if(captureContext.carpetaId){
+      carpeta = await dbGet('carpetas', captureContext.carpetaId);
+    }
+    if(!carpeta){
+      carpeta = await encontrarCarpetaPorDni(parsed.dni);
+    }
+    if(!carpeta){
+      carpeta = { id: uid(), nombre: parsed.nombre||'', dni: parsed.dni||'', telefono:'', estado:'Vigente', createdAt: Date.now(), updatedAt: Date.now() };
+    }else{
+      carpeta.nombre = parsed.nombre || carpeta.nombre;
+      carpeta.dni = parsed.dni || carpeta.dni;
+      carpeta.updatedAt = Date.now();
+    }
+    await dbPut('carpetas', carpeta);
+    currentCarpetaId = carpeta.id;
+
+    // Guardar la imagen/PDF del CUD analizado como documento de la carpeta
+    await dbPut('documentos', {
+      id: uid(), carpetaId: carpeta.id, categoria:'CUD',
+      nombreArchivo: currentFileName || 'CUD.jpg', mimeType: currentImageMime,
+      dataBase64: currentImageBase64, fecha: Date.now()
+    });
+
+    const reg = {
+      nombre: parsed.nombre || '', dni: parsed.dni || '', telefono: carpeta.telefono || '', fnac: parsed.fecha_nacimiento || '',
+      diagnostico: parsed.diagnostico || '', codigos: parsed.codigos || '',
+      tipo: parsed.tipo_discapacidad || 'Motora / física', subtipo: parsed.subtipo || '',
+      modalidad: parsed.modalidad || '', orientacion: parsed.orientacion_prestacion || '',
+      emision: parsed.fecha_emision || '', vencimiento: parsed.fecha_vencimiento || '',
+      junta: parsed.junta || '', firmantes: Array.isArray(parsed.firmantes) ? parsed.firmantes : [], carta: ''
+    };
+    reg.carta = generarCarta(reg);
+    currentReg = reg;
+    fillResultScreen(reg);
+    await dbPut('seguimiento', { id: uid(), carpetaId: carpeta.id, fecha: Date.now(), texto:'Se leyó un CUD con Gemini y se generó el informe.', estadoTramite: null });
+    goto('result');
+  }catch(err){
+    console.error(err);
+    toast('No se pudo analizar el documento: ' + err.message);
+    goto('capture');
+  }
+}
+
+/* ---------- Pantalla de resultado (informe CUD) ---------- */
+let currentReg = null;
+let currentCarpetaId = null;
+
+function fillResultScreen(reg){
+  document.getElementById('f-nombre').value = reg.nombre||'';
+  document.getElementById('f-dni').value = reg.dni||'';
+  document.getElementById('f-telefono').value = reg.telefono||'';
+  document.getElementById('f-fnac').value = reg.fnac||'';
+  document.getElementById('f-diagnostico').value = reg.diagnostico||'';
+  document.getElementById('f-codigos').value = reg.codigos||'';
+  renderGlosarioCodigos();
+  document.getElementById('f-tipo').value = reg.tipo || 'Motora / física';
+  document.getElementById('f-subtipo').value = reg.subtipo||'';
+  document.getElementById('f-modalidad').value = reg.modalidad||'';
+  document.getElementById('f-orientacion').value = reg.orientacion||'';
+  document.getElementById('f-emision').value = reg.emision||'';
+  document.getElementById('f-vencimiento').value = reg.vencimiento||'';
+  document.getElementById('f-junta').value = reg.junta||'';
+  document.getElementById('firmantes-list').innerHTML='';
+  (reg.firmantes&&reg.firmantes.length?reg.firmantes:[{nombre:'',matricula:'',especialidad:''}]).forEach(f=>addFirmante(f.nombre,f.matricula,f.especialidad));
+  renderStudies(reg.tipo || 'Motora / física');
+  renderPrestaciones(reg.tipo || 'Motora / física');
+  document.getElementById('f-efectores').value = reg.efectores || defaultEfectores();
+  document.getElementById('f-pension-tipo').value = reg.tipoPension || 'No aplica / no gestionada';
+  document.getElementById('f-trazabilidad').value = reg.trazabilidad || defaultTrazabilidad();
+  document.getElementById('f-carta').value = reg.carta || generarCarta(reg);
+}
+function readFormIntoReg(){
+  const base = currentReg || {};
+  base.nombre = document.getElementById('f-nombre').value.trim();
+  base.dni = document.getElementById('f-dni').value.trim();
+  base.telefono = document.getElementById('f-telefono').value.trim();
+  base.fnac = document.getElementById('f-fnac').value.trim();
+  base.diagnostico = document.getElementById('f-diagnostico').value.trim();
+  base.codigos = document.getElementById('f-codigos').value.trim();
+  base.tipo = document.getElementById('f-tipo').value;
+  base.subtipo = document.getElementById('f-subtipo').value.trim();
+  base.modalidad = document.getElementById('f-modalidad').value.trim();
+  base.orientacion = document.getElementById('f-orientacion').value.trim();
+  base.emision = document.getElementById('f-emision').value.trim();
+  base.vencimiento = document.getElementById('f-vencimiento').value.trim();
+  base.junta = document.getElementById('f-junta').value.trim();
+  base.firmantes = getFirmantes();
+  base.efectores = document.getElementById('f-efectores').value;
+  base.tipoPension = document.getElementById('f-pension-tipo').value;
+  base.trazabilidad = document.getElementById('f-trazabilidad').value;
+  base.carta = document.getElementById('f-carta').value;
+  return base;
+}
+
+/* ---------- Generación de la carta (plantilla determinística) ---------- */
+function construirFundamentoCIF(items){
+  if(items.length===0) return 'No se registran códigos CIF legibles en la imagen analizada.';
+  const grupos = [['b','FUNCIONES CORPORALES'],['s','ESTRUCTURAS CORPORALES'],['d','ACTIVIDAD Y PARTICIPACIÓN'],['e','FACTORES AMBIENTALES']];
+  let bloques = [];
+  grupos.forEach(([letra,titulo])=>{
+    const grupo = items.filter(it=>it.codigo[0].toLowerCase()===letra);
+    if(grupo.length===0) return;
+    const lineas = grupo.map(it=>`- ${it.codigo}: ${it.descripcion}${it.calificador ? ' — '+it.calificador : ''}`).join('\n');
+    bloques.push(`${titulo}:\n${lineas}`);
+  });
+  return bloques.join('\n\n');
+}
+
+function generarCarta(reg){
+  const hoy = new Date().toLocaleDateString('es-AR', {day:'2-digit', month:'long', year:'numeric'});
+  const info = ESTUDIOS_POR_TIPO[reg.tipo] || ESTUDIOS_POR_TIPO['Motora / física'];
+  const estudios = ESTUDIOS_COMUNES.concat(info.especificos);
+  const prestaciones = listaPrestaciones(reg.tipo);
+  const items = traducirCodigosCif(reg.codigos);
+  const bI = items.filter(i=>/^b/i.test(i.codigo));
+  const sI = items.filter(i=>/^s/i.test(i.codigo));
+  const dI = items.filter(i=>/^d/i.test(i.codigo));
+  const eI = items.filter(i=>/^e/i.test(i.codigo));
+
+  function frase(it, tipo){
+    const desc = it.descripcion.charAt(0).toLowerCase()+it.descripcion.slice(1);
+    if(!it.calificador) return desc;
+    return tipo==='e' ? `${desc} (${it.calificador.toLowerCase()})` : `${desc} (${it.calificador})`;
+  }
+  const parrafoB = bI.length ? `En el plano de las funciones corporales, la evaluación de la Junta documenta ${bI.map(it=>frase(it,'b')).join('; ')}.` : '';
+  const parrafoS = sI.length ? `A nivel de las estructuras corporales se registra ${sI.map(it=>frase(it,'s')).join('; ')}.` : '';
+  const parrafoD = dI.length ? `En el dominio de la actividad y la participación se objetiva una repercusión funcional sobre las siguientes áreas: ${dI.map(it=>frase(it,'d')).join('; ')}.` : '';
+  const todosFacilitadores = eI.length && eI.every(it => /Facilitador/i.test(it.calificador||''));
+  const parrafoE = eI.length ? `Entre los factores ambientales relevados, ${todosFacilitadores ? 'todos ellos con función de facilitador' : 'con función de barrera o facilitador según el caso'}, se identifican: ${eI.map(it=>frase(it,'e')).join('; ')}.` : '';
+
+  const diagTexto = (reg.diagnostico||'no consta en la documentación analizada').trim().replace(/\.+$/,'');
+  const bloqueClinico = [
+    `El diagnóstico consignado en el certificado es el siguiente: ${diagTexto}.`,
+    parrafoB, parrafoS, parrafoD, parrafoE
+  ].filter(Boolean).join(' ');
+
+  const firmantesTxt = (reg.firmantes&&reg.firmantes.length)
+    ? reg.firmantes.map(f=>`${f.nombre||'profesional sin identificar'}${f.especialidad? ', '+f.especialidad:''}${f.matricula? ' (matrícula '+f.matricula+')':''}`).join('; ')
+    : 'no se consignan firmantes legibles en la imagen analizada';
+
+  const tipoTexto = (reg.tipo||'').toLowerCase() || 'a determinar';
+  const fundamentoCIF = construirFundamentoCIF(items);
+  const efectoresTexto = reg.efectores || defaultEfectores();
+  const trazabilidadTexto = reg.trazabilidad || defaultTrazabilidad();
+  const pensionTexto = reg.tipoPension || 'No aplica / no gestionada';
+
+  const cfgFirma = getConfig() || {};
+  const doctorNombre = cfgFirma.doctorNombre || 'Dr. Luis Muratori';
+  const doctorMatricula = cfgFirma.doctorMatricula ? '\n' + cfgFirma.doctorMatricula : '';
+
+  return `Mendoza, ${hoy}
+
+INFORME MÉDICO DE COTEJO DE CERTIFICADO ÚNICO DE DISCAPACIDAD (CUD)
+Paciente: ${reg.nombre||'-'} — D.N.I. ${reg.dni||'-'}${reg.fnac ? ' — Fecha de nacimiento: '+reg.fnac : ''}
+
+En mi carácter de médico interviniente, y a los efectos de dejar constancia formal ante quien corresponda, así como de servir de base documental para su cotejo con el/la paciente en el momento de la consulta, elaboro el presente informe respecto del Certificado Único de Discapacidad correspondiente a ${reg.nombre||'el/la paciente de referencia'}, emitido en el marco de la Ley N.º 22.431 —Sistema de Protección Integral de las Personas con Discapacidad— y su actualización dispuesta por la Ley N.º 27.793.
+
+I. FUNDAMENTO — ANÁLISIS DETALLADO DE LOS CÓDIGOS CIF
+A continuación se detalla, código por código, el perfil funcional consignado en el certificado según la Clasificación Internacional del Funcionamiento (CIF), base sobre la que se apoya la redacción del presente informe:
+
+${fundamentoCIF}
+
+II. SÍNTESIS CLÍNICA
+${bloqueClinico}
+
+III. CLASIFICACIÓN SEGÚN LEY 22.431
+De acuerdo con los artículos 2.º y 3.º de la Ley 22.431, que reconocen como personas con discapacidad a quienes presentan deficiencias físicas, mentales, intelectuales o sensoriales de carácter permanente o prolongado que, al interactuar con las barreras del entorno, pueden ver dificultada su participación plena y efectiva en la sociedad, el cuadro descripto corresponde a una discapacidad de tipo ${tipoTexto}${reg.subtipo ? ', vinculada específicamente a '+reg.subtipo : ''}.
+
+IV. DATOS ADMINISTRATIVOS DEL CERTIFICADO
+La modalidad consignada es ${reg.modalidad||'no consta en la imagen analizada'}, y la orientación prestacional indicada corresponde a ${reg.orientacion||'no consta en la imagen analizada'}. El certificado fue emitido el ${reg.emision||'[fecha no consignada]'} por la ${reg.junta||'Junta Evaluadora interviniente'}, con vigencia hasta ${reg.vencimiento||'[fecha no consignada]'}. Lo suscriben los siguientes profesionales: ${firmantesTxt}.
+
+V. PRESTACIONES ADQUIRIDAS CON EL CUD Y COBERTURA
+En virtud del presente certificado, y conforme a la Ley 24.901 (cobertura del 100% a cargo de la obra social o prepaga, o del Estado si el/la paciente careciera de cobertura) y a la Ley 22.431, corresponden las siguientes prestaciones:
+${prestaciones.map(p=>'- '+p).join('\n')}
+
+VI. EFECTORES PROBABLES EN LA PROVINCIA
+${efectoresTexto}
+
+VII. PRESTACIÓN ECONÓMICA VINCULADA (CONTRIBUTIVA / NO CONTRIBUTIVA)
+${PENSION_EXPLICACION}
+En el presente caso, la prestación económica vinculada consignada es: ${pensionTexto}.
+
+VIII. TRAZABILIDAD DEL APORTE Y PRESTACIONES NO INCLUIDAS
+${trazabilidadTexto}
+
+IX. FUNDAMENTO DE LA FIRMA
+El Certificado Único de Discapacidad constituye un documento público, de emisión gratuita y voluntaria, con validez en todo el territorio nacional, cuyo otorgamiento compete de manera exclusiva a la Junta Evaluadora Interdisciplinaria correspondiente. Mi intervención en este informe se circunscribe, en consecuencia, a certificar que la documentación exhibida por el/la paciente resulta consistente con la emisión referida y con la clasificación normativa precedente, sin que ello implique sustituir el criterio ni la competencia de dicha Junta.
+
+X. DOCUMENTACIÓN SUGERIDA PARA UNA EVENTUAL RENOVACIÓN
+Conforme las directivas vigentes de la Secretaría Nacional de Discapacidad (SENADIS), organismo dependiente del Ministerio de Salud de la Nación que absorbió las funciones de la ex ANDIS —en particular la ${info.normativa}—, corresponde reunir:
+${estudios.map(e=>'- '+e).join('\n')}
+
+XI. CONCLUSIÓN FINAL
+En mi carácter de médico interviniente, y sobre la base del fundamento expuesto en el punto I y de la síntesis clínica del punto II, dejo constancia de que la documentación exhibida por ${reg.nombre||'el/la paciente'} resulta consistente con el diagnóstico de ${diagTexto.toLowerCase()}, con la clasificación de discapacidad de tipo ${tipoTexto}${reg.subtipo ? ' ('+reg.subtipo+')' : ''} conforme la Ley 22.431, y con la orientación prestacional y vigencia consignadas en el certificado emitido por la ${reg.junta||'Junta Evaluadora interviniente'}. En consecuencia, avalo la documentación presentada a los fines administrativos correspondientes, quedando a disposición de quien corresponda para ampliar o precisar cualquiera de los puntos consignados en el presente informe.
+
+${doctorNombre}
+Médico${doctorMatricula}`;
+}
+/* ----------------------------------------------------------------
+   Guía para el paciente (lenguaje simple)
+   ---------------------------------------------------------------- */
+const DESCRIPCION_SIMPLE = {
+  'Motora / física': 'Significa que tenés una dificultad física para moverte o para usar alguna parte de tu cuerpo (piernas, brazos, columna, etc.), de forma permanente o prolongada.',
+  'Sensorial - Visual': 'Significa que tenés una dificultad importante para ver.',
+  'Sensorial - Auditiva': 'Significa que tenés una dificultad importante para oír.',
+  'Mental - Intelectual': 'Significa que tenés una forma distinta de aprender, entender o resolver situaciones de la vida diaria.',
+  'Mental - Psicosocial': 'Significa que tenés una condición de salud mental que afecta tu vida diaria.',
+  'Visceral': 'Significa que tenés una enfermedad de un órgano interno (por ejemplo el riñón, el corazón o los pulmones) que afecta tu salud de forma importante.',
+  'Mixta': 'Significa que tenés más de una de estas dificultades a la vez.'
+};
+const ESPECIFICOS_SIMPLES = {
+  'Motora / física': ['Un informe del traumatólogo o neurólogo que te trata, y estudios como radiografías o resonancias si te las pidieron.'],
+  'Sensorial - Visual': ['Un informe del oftalmólogo con el examen de tu visión.'],
+  'Sensorial - Auditiva': ['Un estudio de audición (audiometría) y un informe del especialista en oído.'],
+  'Mental - Intelectual': ['Una evaluación psicológica que muestre cómo es tu forma de aprender y resolver situaciones.'],
+  'Mental - Psicosocial': ['Un informe del psiquiatra o un resumen de tu historia clínica de salud mental.'],
+  'Visceral': ['Los estudios del órgano afectado (por ejemplo análisis de riñón, ecografías o estudios del corazón) y el informe del especialista que te trata.'],
+  'Mixta': ['Los estudios e informes de cada especialista que te atiende, según cada dificultad que tengas.']
+};
+function listaDocumentosSimple(tipo, esRenovacion){
+  const base = [
+    'Tu Documento Nacional de Identidad (DNI), original y una fotocopia',
+    'Un Certificado Médico Obligatorio (no puede tener más de 6 meses), completado por el médico que te trata',
+    'Los estudios médicos que confirman tu diagnóstico (no mayores a 12 meses)',
+    'La planilla específica según tu tipo de discapacidad (te la puede dar tu médico)'
+  ];
+  if(esRenovacion) base.push('El CUD anterior (el certificado que ya tenías), aunque esté vencido o por vencer');
+  const especifico = tipo ? (ESPECIFICOS_SIMPLES[tipo]||[]) : [];
+  return base.concat(especifico);
+}
+function generarGuiaPaciente(carpeta, reg){
+  const nombre = (carpeta && carpeta.nombre) || 'Paciente';
+  const tipo = reg ? reg.tipo : null;
+  const subtipo = reg && reg.subtipo ? reg.subtipo : '';
+  let texto = `GUÍA SENCILLA SOBRE TU CERTIFICADO ÚNICO DE DISCAPACIDAD (CUD)
+Preparada para: ${nombre}
+
+¿QUÉ ES EL CUD?
+El Certificado Único de Discapacidad (CUD) es un documento gratuito y válido en todo el país. Te lo otorga una Junta Evaluadora de médicos, y te permite acceder a distintos derechos y ayudas del Estado.
+`;
+  if(tipo){
+    texto += `
+¿QUÉ SIGNIFICA TU DISCAPACIDAD?
+${DESCRIPCION_SIMPLE[tipo] || ''}${subtipo ? ' En tu caso, específicamente: '+subtipo+'.' : ''}
+`;
+  }
+  texto += `
+¿QUÉ BENEFICIOS TE DA?
+- Salud: cobertura del 100% en los tratamientos, medicamentos y rehabilitación relacionados con tu discapacidad.
+- Transporte: viajes gratis en colectivos, trenes y micros de larga distancia.
+- Símbolo de acceso: para estacionar en los lugares habilitados.
+- Asignaciones familiares, si corresponden.
+- Exención de algunos impuestos y peajes.
+
+DOCUMENTACIÓN PARA INICIAR EL TRÁMITE (si es la primera vez)
+${listaDocumentosSimple(tipo, false).map(x=>'- '+x).join('\n')}
+
+DOCUMENTACIÓN PARA RENOVAR TU CUD (cuando esté por vencer)
+${listaDocumentosSimple(tipo, true).map(x=>'- '+x).join('\n')}
+
+¿DÓNDE SE TRAMITA?
+En la Junta Evaluadora de discapacidad más cercana a tu domicilio, pidiendo un turno. Es un trámite gratuito y voluntario.
+
+Ante cualquier duda, consultá con tu médico de cabecera.`;
+  return texto;
+}
+async function obtenerRegMasReciente(carpetaId){
+  const docs = await dbGetByIndex('documentos','carpetaId', carpetaId);
+  const informes = docs.filter(d=>d.categoria==='Informe').sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  if(informes.length===0) return null;
+  try{ return JSON.parse(informes[0].textoInforme); }catch(e){ return null; }
+}
+async function cargarGuiaEnCarpeta(carpetaId){
+  const docs = await dbGetByIndex('documentos','carpetaId', carpetaId);
+  const guias = docs.filter(d=>d.categoria==='GuiaPaciente').sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  const carpeta = await dbGet('carpetas', carpetaId);
+  if(guias.length){
+    document.getElementById('guia-texto').value = guias[0].textoInforme;
+  }else{
+    const reg = await obtenerRegMasReciente(carpetaId);
+    document.getElementById('guia-texto').value = generarGuiaPaciente(carpeta, reg);
+  }
+}
+async function regenerarGuia(){
+  const reg = await obtenerRegMasReciente(currentCarpetaId);
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  document.getElementById('guia-texto').value = generarGuiaPaciente(carpeta, reg);
+  toast('Guía regenerada');
+}
+async function guardarGuiaActual(){
+  const texto = document.getElementById('guia-texto').value;
+  await dbPut('documentos', { id: uid(), carpetaId: currentCarpetaId, categoria:'GuiaPaciente', nombreArchivo:'Guia_Paciente.doc', mimeType:'application/json', dataBase64:'', textoInforme: texto, fecha: Date.now() });
+}
+function escNl(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+async function descargarWordGuia(){
+  await guardarGuiaActual();
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  const texto = document.getElementById('guia-texto').value;
+  const body = `<h1 style="font-family:Calibri;color:#244C46;">Guía para el paciente</h1><p style="white-space:pre-wrap;">${escNl(texto)}</p>`;
+  const blob = buildDocBlobGeneric(body, 'Guía paciente');
+  downloadBlob(blob, `Guia_Paciente_${(carpeta.dni||'sin_dni').replace(/[^0-9A-Za-z]/g,'')}.doc`);
+  toast('Guía descargada');
+}
+async function compartirGuia(){
+  await guardarGuiaActual();
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  const texto = document.getElementById('guia-texto').value;
+  const body = `<h1 style="font-family:Calibri;color:#244C46;">Guía para el paciente</h1><p style="white-space:pre-wrap;">${escNl(texto)}</p>`;
+  const blob = buildDocBlobGeneric(body, 'Guía paciente');
+  const filename = `Guia_Paciente_${(carpeta.dni||'sin_dni').replace(/[^0-9A-Za-z]/g,'')}.doc`;
+  try{
+    const file = new File([blob], filename, {type:'application/msword'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'Guía sobre tu CUD', text:'Te comparto una guía sencilla sobre tu Certificado Único de Discapacidad.'});
+      toast('Compartido'); return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; }
+  downloadBlob(blob, filename);
+  toast('Guía descargada. Compartila por WhatsApp o mail manualmente.');
+}
+
+function regenerarCarta(){
+  const reg = readFormIntoReg();
+  reg.carta = generarCarta(reg);
+  document.getElementById('f-carta').value = reg.carta;
+  currentReg = reg;
+  toast('Carta regenerada con los datos actuales');
+}
+
+/* ---------- Guardar informe en la carpeta ---------- */
+async function guardarInforme(){
+  const reg = readFormIntoReg();
+  currentReg = reg;
+  let carpeta = currentCarpetaId ? await dbGet('carpetas', currentCarpetaId) : null;
+  if(!carpeta){ carpeta = await encontrarCarpetaPorDni(reg.dni); }
+  if(!carpeta){ carpeta = { id: uid(), createdAt: Date.now(), estado:'Vigente' }; }
+  carpeta.nombre = reg.nombre; carpeta.dni = reg.dni; carpeta.telefono = reg.telefono || carpeta.telefono || '';
+  carpeta.updatedAt = Date.now();
+  await dbPut('carpetas', carpeta);
+  currentCarpetaId = carpeta.id;
+
+  await dbPut('documentos', {
+    id: uid(), carpetaId: carpeta.id, categoria:'Informe',
+    nombreArchivo: 'Informe_CUD.doc', mimeType:'application/json',
+    dataBase64:'', textoInforme: JSON.stringify(reg), fecha: Date.now()
+  });
+  await dbPut('seguimiento', { id: uid(), carpetaId: carpeta.id, fecha: Date.now(), texto:'Informe CUD generado/actualizado.', estadoTramite: null });
+
+  const cfg = getConfig() || {};
+  if(cfg.modo === 'conectado' && cfg.backendUrl){
+    try{
+      const resp = await fetch(cfg.backendUrl, {
+        method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ accion:'guardar_registro_cud', token: cfg.backendToken || '', registro: reg })
+      });
+      toast(resp.ok ? 'Guardado y sincronizado con Sistema Médico Muratori' : 'Guardado localmente. No se pudo sincronizar con el backend.');
+    }catch(e){ toast('Guardado localmente. Sin conexión al backend en este momento.'); }
+  }else{
+    toast('Informe guardado en la carpeta');
+  }
+  goto('carpeta');
+}
+function descargarWordInforme(){
+  const reg = readFormIntoReg();
+  const blob = buildDocBlobInforme(reg);
+  downloadBlob(blob, fileNameForInforme(reg));
+  toast('Word descargado');
+}
+async function compartirPorMail(){
+  const reg = readFormIntoReg();
+  const cfg = getConfig() || {};
+  const email = cfg.email || 'drluismuratori@gmail.com';
+  const filename = fileNameForInforme(reg);
+  const blob = buildDocBlobInforme(reg);
+  const subject = `Informe CUD - ${reg.nombre||'Paciente'} (DNI ${reg.dni||'-'})`;
+  const bodyText = `Adjunto informe de Certificado Único de Discapacidad correspondiente a ${reg.nombre||'-'} (DNI ${reg.dni||'-'}).`;
+  try{
+    const file = new File([blob], filename, {type:'application/msword'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title: subject, text: bodyText});
+      toast('Compartido'); return;
+    }
+  }catch(e){ if(e && e.name==='AbortError') return; }
+  downloadBlob(blob, filename);
+  window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText + '\n\n(Se descargó ' + filename + ': adjuntalo manualmente)')}`;
+}
+
+/* ---------- Carpeta: pantalla detalle ---------- */
+async function abrirCarpeta(id){
+  currentCarpetaId = id;
+  const carpeta = await dbGet('carpetas', id);
+  if(!carpeta){ toast('No se encontró la carpeta'); return; }
+  document.getElementById('cp-nombre').textContent = carpeta.nombre || 'Sin nombre';
+  document.getElementById('cp-meta').innerHTML = `DNI ${escapeHtml(carpeta.dni||'-')} · Creada ${new Date(carpeta.createdAt).toLocaleDateString('es-AR')} · Actualizada ${new Date(carpeta.updatedAt).toLocaleDateString('es-AR')}`;
+  document.getElementById('cp-estado-chip').textContent = carpeta.estado || 'Vigente';
+  document.getElementById('cp-telefono').value = carpeta.telefono || '';
+  document.getElementById('cp-estado-select').value = carpeta.estado || 'Vigente';
+  document.getElementById('cp-recomendaciones').value = carpeta.recomendaciones || '';
+  await renderDocumentos(id);
+  await renderInformeResumen(id);
+  await renderTimeline(id);
+  await cargarGuiaEnCarpeta(id);
+  goto('carpeta');
+}
+async function actualizarDatosCarpeta(){
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  if(!carpeta) return;
+  carpeta.telefono = document.getElementById('cp-telefono').value.trim();
+  carpeta.updatedAt = Date.now();
+  await dbPut('carpetas', carpeta);
+  toast('Teléfono actualizado');
+}
+async function renderDocumentos(carpetaId){
+  const docs = await dbGetByIndex('documentos','carpetaId', carpetaId);
+  docs.sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  const list = document.getElementById('documentos-list');
+  if(docs.length===0){ list.innerHTML = '<p class="faint" style="margin-bottom:10px;">Todavía no hay documentos en esta carpeta.</p>'; return; }
+  list.innerHTML = docs.map(d=>{
+    const icon = d.categoria==='CUD' ? '📋' : d.categoria==='DNI' ? '🪪' : d.categoria==='Informe' ? '📝' : '📎';
+    return `<div class="doc-item">
+      <div class="doc-icon">${icon}</div>
+      <div class="doc-info"><div class="n">${escapeHtml(d.nombreArchivo||d.categoria)}</div><div class="s">${escapeHtml(d.categoria)} · ${new Date(d.fecha).toLocaleDateString('es-AR')}</div></div>
+      <div class="doc-actions">
+        ${d.dataBase64 ? `<button title="Ver/descargar" onclick="verDocumento('${d.id}')">⬇</button>` : ''}
+        <button title="Eliminar" onclick="eliminarDocumento('${d.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function verDocumento(docId){
+  const doc = await dbGet('documentos', docId);
+  if(!doc || !doc.dataBase64){ toast('Documento sin contenido descargable'); return; }
+  const byteChars = atob(doc.dataBase64);
+  const bytes = new Uint8Array(byteChars.length);
+  for(let i=0;i<byteChars.length;i++) bytes[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([bytes], {type: doc.mimeType});
+  downloadBlob(blob, doc.nombreArchivo || 'documento');
+}
+async function eliminarDocumento(docId){
+  if(!confirm('¿Eliminar este documento de la carpeta?')) return;
+  await dbDelete('documentos', docId);
+  toast('Documento eliminado');
+  renderDocumentos(currentCarpetaId);
+}
+async function renderInformeResumen(carpetaId){
+  const docs = await dbGetByIndex('documentos','carpetaId', carpetaId);
+  const informes = docs.filter(d=>d.categoria==='Informe').sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  const el = document.getElementById('cp-informe-resumen');
+  if(informes.length===0){ el.textContent = 'Todavía no se generó un informe en esta carpeta.'; return; }
+  const ultimo = informes[0];
+  try{
+    const reg = JSON.parse(ultimo.textoInforme);
+    el.innerHTML = `<b>${escapeHtml(reg.tipo||'')}</b> ${escapeHtml(reg.subtipo||'')}<br>${escapeHtml((reg.diagnostico||'').slice(0,140))}${(reg.diagnostico||'').length>140?'…':''}<br><span class="faint">Última actualización: ${new Date(ultimo.fecha).toLocaleDateString('es-AR')}</span>`;
+  }catch(e){ el.textContent = 'Informe disponible (no se pudo previsualizar).'; }
+}
+async function editarInformeDesdeCarpeta(){
+  const docs = await dbGetByIndex('documentos','carpetaId', currentCarpetaId);
+  const informes = docs.filter(d=>d.categoria==='Informe').sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  if(informes.length===0){ toast('Todavía no hay informe en esta carpeta. Usá "Leer nuevo CUD".'); return; }
+  try{
+    const reg = JSON.parse(informes[0].textoInforme);
+    currentReg = reg;
+    fillResultScreen(reg);
+    goto('result');
+  }catch(e){ toast('No se pudo abrir el informe guardado'); }
+}
+async function renderTimeline(carpetaId){
+  const entradas = await dbGetByIndex('seguimiento','carpetaId', carpetaId);
+  entradas.sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  const list = document.getElementById('timeline-list');
+  if(entradas.length===0){ list.innerHTML = '<p class="faint">Sin actualizaciones todavía.</p>'; return; }
+  list.innerHTML = entradas.map(e=>`<div class="tl-item"><div class="tl-fecha">${new Date(e.fecha).toLocaleString('es-AR')}${e.estadoTramite?' · Estado: '+escapeHtml(e.estadoTramite):''}</div><div class="tl-texto">${escapeHtml(e.texto)}</div></div>`).join('');
+}
+async function cambiarEstadoRapido(){
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  if(!carpeta) return;
+  const nuevo = document.getElementById('cp-estado-select').value;
+  carpeta.estado = nuevo; carpeta.updatedAt = Date.now();
+  await dbPut('carpetas', carpeta);
+  document.getElementById('cp-estado-chip').textContent = nuevo;
+  await dbPut('seguimiento', { id: uid(), carpetaId: currentCarpetaId, fecha: Date.now(), texto: `Estado del trámite actualizado a "${nuevo}".`, estadoTramite: nuevo });
+  await renderTimeline(currentCarpetaId);
+  toast('Estado actualizado');
+}
+async function guardarRecomendaciones(){
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  if(!carpeta) return;
+  carpeta.recomendaciones = document.getElementById('cp-recomendaciones').value;
+  carpeta.updatedAt = Date.now();
+  await dbPut('carpetas', carpeta);
+  toast('Recomendaciones guardadas');
+}
+async function agregarActualizacion(){
+  const texto = document.getElementById('nueva-actualizacion').value.trim();
+  if(!texto){ toast('Escribí una novedad primero'); return; }
+  await dbPut('seguimiento', { id: uid(), carpetaId: currentCarpetaId, fecha: Date.now(), texto, estadoTramite: null });
+  document.getElementById('nueva-actualizacion').value = '';
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  if(carpeta){ carpeta.updatedAt = Date.now(); await dbPut('carpetas', carpeta); }
+  await renderTimeline(currentCarpetaId);
+  toast('Actualización agregada');
+}
+async function marcarFinalizada(){
+  if(!confirm('¿Marcar este trámite como finalizado?')) return;
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  if(!carpeta) return;
+  carpeta.estado = 'Finalizado'; carpeta.updatedAt = Date.now();
+  await dbPut('carpetas', carpeta);
+  document.getElementById('cp-estado-select').value = 'Finalizado';
+  document.getElementById('cp-estado-chip').textContent = 'Finalizado';
+  await dbPut('seguimiento', { id: uid(), carpetaId: currentCarpetaId, fecha: Date.now(), texto:'Trámite marcado como finalizado.', estadoTramite:'Finalizado' });
+  await renderTimeline(currentCarpetaId);
+  toast('Trámite finalizado');
+}
+
+/* ---------- Generación de documentos Word ---------- */
+function buildDocBlobGeneric(bodyHtml, title){
+  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+  <head><meta charset='utf-8'><title>${title}</title>
+  <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+  <style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.5;color:#1B2420;}
+  table{border-collapse:collapse;width:100%;margin-bottom:14px;}
+  td,th{border:1px solid #999;padding:6px 8px;font-size:10pt;text-align:left;vertical-align:top;}
+  th{background:#DCE7E2;}</style></head><body>${bodyHtml}</body></html>`;
+  return new Blob(['\ufeff', html], {type:'application/msword'});
+}
+function buildDocBlobInforme(reg){
+  const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const firmantesRows = (reg.firmantes&&reg.firmantes.length ? reg.firmantes : [{nombre:'-',matricula:'-',especialidad:'-'}])
+    .map(f=>`<tr><td>${esc(f.nombre)}</td><td>${esc(f.especialidad)}</td><td>${esc(f.matricula)}</td></tr>`).join('');
+  const glosarioItems = traducirCodigosCif(reg.codigos);
+  const glosarioRows = glosarioItems.map(it=>`<tr><td>${esc(it.codigo)}</td><td>${esc(it.descripcion)}</td><td>${esc(it.calificador||'-')}</td></tr>`).join('');
+  const prestacionesRows = listaPrestaciones(reg.tipo).map(p=>`<tr><td>${esc(p)}</td></tr>`).join('');
+  const body = `
+  <h1 style="font-family:Calibri;color:#244C46;">Informe de Certificado Único de Discapacidad</h1>
+  <p><b>Paciente:</b> ${esc(reg.nombre)} &nbsp; <b>DNI:</b> ${esc(reg.dni)} &nbsp; <b>Teléfono:</b> ${esc(reg.telefono)}</p>
+  <table><tr><th>Campo</th><th>Detalle</th></tr>
+    <tr><td>Diagnóstico</td><td>${esc(reg.diagnostico)}</td></tr>
+    <tr><td>Códigos CIE/CIF</td><td>${esc(reg.codigos)}</td></tr>
+    <tr><td>Tipo de discapacidad (Ley 22.431)</td><td>${esc(reg.tipo)} ${esc(reg.subtipo)}</td></tr>
+    <tr><td>Modalidad</td><td>${esc(reg.modalidad)}</td></tr>
+    <tr><td>Orientación de la prestación</td><td>${esc(reg.orientacion)}</td></tr>
+    <tr><td>Fecha de emisión</td><td>${esc(reg.emision)}</td></tr>
+    <tr><td>Fecha de vencimiento</td><td>${esc(reg.vencimiento)}</td></tr>
+    <tr><td>Junta Evaluadora</td><td>${esc(reg.junta)}</td></tr>
+    <tr><td>Prestación económica vinculada</td><td>${esc(reg.tipoPension||'No aplica / no gestionada')}</td></tr>
+  </table>
+  ${glosarioItems.length ? `<h3 style="font-family:Calibri;color:#244C46;">Fundamento — Glosario de códigos CIF</h3>
+  <table><tr><th>Código</th><th>Significado</th><th>Sub-clasificación</th></tr>${glosarioRows}</table>` : ''}
+  <h3 style="font-family:Calibri;color:#244C46;">Prestaciones adquiridas con el CUD y cobertura</h3>
+  <table><tr><th>Prestación / cobertura</th></tr>${prestacionesRows}</table>
+  <h3 style="font-family:Calibri;color:#244C46;">Efectores probables en la provincia</h3>
+  <p style="white-space:pre-wrap;">${esc(reg.efectores||defaultEfectores())}</p>
+  <h3 style="font-family:Calibri;color:#244C46;">Trazabilidad del aporte y prestaciones no incluidas</h3>
+  <p style="white-space:pre-wrap;">${esc(reg.trazabilidad||defaultTrazabilidad())}</p>
+  <h3 style="font-family:Calibri;color:#244C46;">Firmantes</h3>
+  <table><tr><th>Nombre</th><th>Especialidad</th><th>Matrícula</th></tr>${firmantesRows}</table>
+  <h3 style="font-family:Calibri;color:#244C46;">Informe completo</h3>
+  <p style="white-space:pre-wrap;">${esc(reg.carta)}</p>`;
+  return buildDocBlobGeneric(body, 'Informe CUD');
+}
+async function descargarWordSeguimiento(){
+  const carpeta = await dbGet('carpetas', currentCarpetaId);
+  const entradas = await dbGetByIndex('seguimiento','carpetaId', currentCarpetaId);
+  entradas.sort((a,b)=>(b.fecha||0)-(a.fecha||0));
+  const esc = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const filas = entradas.map(e=>`<tr><td>${new Date(e.fecha).toLocaleString('es-AR')}</td><td>${esc(e.estadoTramite||'-')}</td><td>${esc(e.texto)}</td></tr>`).join('');
+  const body = `
+  <h1 style="font-family:Calibri;color:#244C46;">Estado y seguimiento del trámite de CUD</h1>
+  <p><b>Paciente:</b> ${esc(carpeta.nombre)} &nbsp; <b>DNI:</b> ${esc(carpeta.dni)} &nbsp; <b>Teléfono:</b> ${esc(carpeta.telefono)}</p>
+  <p><b>Estado actual:</b> ${esc(carpeta.estado)}</p>
+  <h3 style="font-family:Calibri;color:#244C46;">Recomendaciones</h3>
+  <p style="white-space:pre-wrap;">${esc(carpeta.recomendaciones||'Sin recomendaciones registradas.')}</p>
+  <h3 style="font-family:Calibri;color:#244C46;">Historial de actualizaciones</h3>
+  <table><tr><th>Fecha</th><th>Estado</th><th>Novedad</th></tr>${filas}</table>`;
+  const blob = buildDocBlobGeneric(body, 'Seguimiento CUD');
+  downloadBlob(blob, `Seguimiento_CUD_${(carpeta.dni||'sin_dni').replace(/[^0-9A-Za-z]/g,'')}.doc`);
+  toast('Word de seguimiento descargado');
+}
+function fileNameForInforme(reg){ return `Informe_CUD_${(reg.dni||'sin_dni').replace(/[^0-9A-Za-z]/g,'')}.doc`; }
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+
+/* ---------- Service Worker ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+
+/* ---------- Init ---------- */
+(async function init(){
+  addFirmante('','','');
+  document.getElementById('fab-camera').style.display = 'none';
+  await migrarHistorialAntiguoSiExiste();
+  const cfg = getConfig();
+  if(cfg && cfg.apiKey){ goto('home'); } else { goto('setup'); }
+})();
+</script>
+</body>
+</html>
