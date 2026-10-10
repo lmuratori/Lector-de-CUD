@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluación semanal de kinesiología — SIM-M</title>
+<style>
+  :root{ --verde:#16a34a; --verde-osc:#166534; --azul:#0369a1; --ambar:#b45309; --rojo:#dc2626; --muted:#64748b; --border:#e2e8f0; --bg:#f8fafc; }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);margin:0;color:#0f172a;line-height:1.5;padding-bottom:50px}
+  .topbar{background:linear-gradient(135deg,var(--verde),var(--verde-osc));color:#fff;padding:20px 16px;text-align:center}
+  .topbar h1{font-size:18px;margin:0 0 4px;font-weight:800}
+  .topbar p{font-size:12px;margin:0;opacity:.92}
+  .wrap{max-width:560px;margin:0 auto;padding:14px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 4px;color:var(--verde-osc)}
+  .sub{font-size:12px;color:var(--muted);margin:0 0 10px}
+  label.l{display:block;font-size:13px;font-weight:600;color:#334155;margin:12px 0 5px}
+  select,textarea,input[type=text]{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+  textarea{min-height:70px;resize:vertical}
+  input[type=range]{width:100%}
+  .val{display:inline-block;min-width:28px;text-align:center;font-weight:800;color:var(--verde-osc);font-size:18px}
+  .fila{display:flex;align-items:center;gap:10px}
+  .fila input[type=range]{flex:1}
+  .psfs-row{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:12px;padding:10px;border:1px dashed var(--border);border-radius:10px}
+  .bandera{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:7px;font-size:13px;cursor:pointer}
+  .bandera input{margin-top:3px;width:18px;height:18px;flex-shrink:0}
+  .bandera.on{background:#fef2f2;border-color:#fca5a5}
+  .aviso{background:#fffbeb;border:1px solid #fcd34d;color:#78350f;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:14px}
+  button.enviar{width:100%;margin-top:6px;padding:14px;border:none;border-radius:10px;background:var(--verde);color:#fff;font-size:16px;font-weight:800;cursor:pointer}
+  button.enviar:disabled{opacity:.6}
+  .muted{color:var(--muted);font-size:12.5px}
+  .err{color:var(--rojo);font-size:13px;margin-top:8px}
+  .exito{display:none;text-align:center;padding:26px 18px}
+  .exito.show{display:block}
+  .oculto{display:none}
+  .semaforo{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:800;font-size:12px;color:#fff;margin-bottom:10px}
+  .semaforo.verde{background:#16a34a}.semaforo.amarillo{background:#d97706}.semaforo.rojo{background:#dc2626}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>🦵 Tu evaluación semanal de kinesiología</h1>
+  <p>Consultorio Dr. Luis Alberto Muratori — le llega a tu kinesiólogo/a y, si hace falta, al médico</p>
+</div>
+
+<div class="wrap">
+  <div id="formulario">
+    <p id="saludo" class="muted"></p>
+
+    <div class="aviso">⚠️ Este formulario <b>no es para urgencias</b>. Si tenés dificultad para controlar la orina o la materia fecal, adormecimiento en la entrepierna, o perdés fuerza rápidamente en un brazo o una pierna, andá a una guardia ahora.</div>
+
+    <div class="card">
+      <h2>✅ Cumplimiento</h2>
+      <p class="sub">Durante esta última semana (0 = nada, 10 = completo).</p>
+      <label class="l">Ejercicios que te indicaron para hacer en casa</label>
+      <div class="fila"><input type="range" id="cumEj" min="0" max="10" value="5"><span class="val" id="cumEjV">5</span></div>
+      <label class="l">Asistencia a las sesiones de kinesiología</label>
+      <div class="fila"><input type="range" id="cumSe" min="0" max="10" value="5"><span class="val" id="cumSeV">5</span></div>
+      <label class="l">¿Cómo toleraste los ejercicios?</label>
+      <select id="tolerancia"><option value="Buena">Bien</option><option value="Regular">Regular — me costaron o me dolieron un poco</option><option value="Mala">Mal — no los pude hacer o me hicieron mal</option></select>
+    </div>
+
+    <div class="card">
+      <h2>🌡️ Dolor</h2>
+      <p class="sub">0 = sin dolor · 10 = el peor dolor que podrías imaginar.</p>
+      <label class="l">En reposo (quieto o sentado)</label>
+      <div class="fila"><input type="range" id="evaR" min="0" max="10" value="0"><span class="val" id="evaRV">0</span></div>
+      <label class="l">En movimiento (al hacer tus actividades o ejercicios)</label>
+      <div class="fila"><input type="range" id="evaM" min="0" max="10" value="0"><span class="val" id="evaMV">0</span></div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 Tus actividades</h2>
+      <p class="sub">Escribí hasta 3 actividades que hoy te cuestan por este problema (por ejemplo: subir escaleras, agarrar a un nieto, correr, dormir de costado). Después puntuá qué tan bien las podés hacer: <b>0 = no puedo hacerla · 10 = la hago como antes</b>. Si ya cargaste actividades antes, usá las mismas para ver cómo evolucionás.</p>
+      <div id="psfs"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔄 Cómo te sentís</h2>
+      <label class="l">Comparado con la semana pasada, ¿cómo estás?</label>
+      <select id="cambio"><option>Mucho mejor</option><option>Algo mejor</option><option selected>Igual</option><option>Algo peor</option><option>Mucho peor</option></select>
+      <label class="l">Región tratada</label>
+      <select id="region">
+        <option>Cervical</option><option>Hombro</option><option>Codo</option><option>Muñeca / Mano</option><option>Columna dorsal</option>
+        <option>Columna lumbar</option><option>Cadera</option><option>Rodilla</option><option>Tobillo / Pie</option><option>Otra</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h2>🚩 Señales de alerta</h2>
+      <p class="sub">Marcá solo las que te pasaron <b>desde la última evaluación</b>. Si no te pasó ninguna, dejalas en blanco.</p>
+      <div id="banderas"></div>
+    </div>
+
+    <div class="card">
+      <h2>💬 Para tu kinesiólogo/a (opcional)</h2>
+      <label class="l">¿Encontraste alguna dificultad?</label>
+      <textarea id="dificultades" placeholder="Ej: me costó el ejercicio 3, sentí molestia al subir escaleras..."></textarea>
+      <label class="l">¿Querés hacerle una pregunta?</label>
+      <textarea id="pregunta" placeholder="Escribí tu pregunta acá si tenés alguna..."></textarea>
+    </div>
+
+    <button class="enviar" id="btnEnviar" onclick="enviar()">Enviar mi evaluación</button>
+    <p class="err" id="mensajeError"></p>
+  </div>
+
+  <div class="card exito" id="exito">
+    <div id="semaforoRes"></div>
+    <h2 style="font-size:20px">✅ ¡Gracias!</h2>
+    <p id="mensajeRes"></p>
+  </div>
+</div>
+
+<script>
+// Misma URL que usan OCM y el resto de las páginas de pacientes (esta página
+// no usa token: la completa el paciente desde el link que recibe por mail,
+// igual que la autoevaluación RMYT; el backend exige que el DNI exista y
+// limita los envíos por día).
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwYdoFuU8mQL4YKqufSBQ9AD_yqWEEesLtGzYQjNw2JG1BZIQF7ug80mHB5sLMXhaUpvQ/exec';
+
+const params = new URLSearchParams(window.location.search);
+const dni = (params.get('dni') || '').replace(/\D/g,'');
+const nombrePaciente = params.get('nombre') || '';
+const regionPre = params.get('region') || '';
+
+const BANDERAS = [
+  ['noche_progresivo', 'Dolor intenso que no cede en reposo o que me despierta de noche, y va en aumento'],
+  ['fuerza_progresiva', 'Pérdida de fuerza que va en aumento en un brazo o una pierna'],
+  ['neuro_aumento', 'Hormigueo o adormecimiento constante o que va en aumento'],
+  ['esfinteres_silla', 'Dificultad para controlar la orina o la materia fecal, o adormecimiento en la zona genital/entrepierna'],
+  ['fiebre', 'Fiebre o malestar general junto con el dolor'],
+  ['hinchazon_caliente', 'Hinchazón, calor y enrojecimiento nuevos en una articulación o en la pierna'],
+  ['caida_golpe', 'Una caída o un golpe nuevo']
+];
+
+document.getElementById('saludo').textContent = nombrePaciente ? ('Hola ' + nombrePaciente + ', completá esto en un par de minutos:') : 'Completá esto en un par de minutos:';
+if(regionPre){ const s = document.getElementById('region'); for(const o of s.options){ if(o.value===regionPre){ s.value = regionPre; break; } } }
+
+[['cumEj','cumEjV'],['cumSe','cumSeV'],['evaR','evaRV'],['evaM','evaMV']].forEach(([a,b])=>{
+  const el = document.getElementById(a); el.addEventListener('input', ()=>{ document.getElementById(b).textContent = el.value; });
+});
+
+// PSFS: hasta 3 actividades; se recuerdan en este dispositivo para repetirlas la semana siguiente
+let psfsGuardadas = [];
+try{ psfsGuardadas = JSON.parse(localStorage.getItem('kep_psfs_' + dni) || '[]'); }catch(_){ psfsGuardadas = []; }
+const psfsEl = document.getElementById('psfs');
+for(let i=0;i<3;i++){
+  const d = document.createElement('div'); d.className = 'psfs-row';
+  d.innerHTML = '<input type="text" id="psfsA'+i+'" maxlength="120" placeholder="Actividad '+(i+1)+(i? ' (opcional)' : '')+'" value="'+((psfsGuardadas[i]||'').replace(/"/g,'&quot;'))+'">' +
+    '<div class="fila"><input type="range" id="psfsV'+i+'" min="0" max="10" value="5"><span class="val" id="psfsVV'+i+'">5</span></div>';
+  psfsEl.appendChild(d);
+  d.querySelector('input[type=range]').addEventListener('input', e=>{ document.getElementById('psfsVV'+i).textContent = e.target.value; });
+}
+
+const bEl = document.getElementById('banderas');
+BANDERAS.forEach(([k,t])=>{
+  const l = document.createElement('label'); l.className = 'bandera';
+  l.innerHTML = '<input type="checkbox" value="'+k+'"><span>'+t+'</span>';
+  l.querySelector('input').addEventListener('change', e=>{ l.classList.toggle('on', e.target.checked); });
+  bEl.appendChild(l);
+});
+
+function enviar(){
+  const err = document.getElementById('mensajeError'); err.textContent = '';
+  if(!dni){ err.textContent = 'Falta el DNI en el link — pedile a tu kinesiólogo/a que te lo reenvíe.'; return; }
+  const psfs = [], nombres = [];
+  for(let i=0;i<3;i++){
+    const a = document.getElementById('psfsA'+i).value.trim();
+    if(a){ psfs.push({actividad:a, valor:Number(document.getElementById('psfsV'+i).value)}); nombres.push(a); }
+  }
+  try{ localStorage.setItem('kep_psfs_' + dni, JSON.stringify(nombres)); }catch(_){}
+  const banderas = Array.from(document.querySelectorAll('#banderas input:checked')).map(x=>x.value);
+  const btn = document.getElementById('btnEnviar'); btn.disabled = true; btn.textContent = 'Enviando…';
+  fetch(SHEETS_URL, {
+    method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ action:'kep_submit', dni:dni, region:document.getElementById('region').value, datos:{
+      cumplimiento_ejercicios:Number(document.getElementById('cumEj').value),
+      cumplimiento_sesiones:Number(document.getElementById('cumSe').value),
+      tolerancia:document.getElementById('tolerancia').value,
+      eva_reposo:Number(document.getElementById('evaR').value),
+      eva_movimiento:Number(document.getElementById('evaM').value),
+      psfs:psfs, cambio_global:document.getElementById('cambio').value, banderas:banderas,
+      dificultades:document.getElementById('dificultades').value.trim(), pregunta:document.getElementById('pregunta').value.trim()
+    }})
+  }).then(r=>r.json()).then(res=>{
+    btn.disabled = false; btn.textContent = 'Enviar mi evaluación';
+    if(!res.success){ err.textContent = res.error || 'No se pudo enviar. Intentá de nuevo.'; return; }
+    document.getElementById('formulario').classList.add('oculto');
+    document.getElementById('mensajeRes').textContent = res.mensaje || 'Tu kinesiólogo/a ya recibió tu evaluación.';
+    document.getElementById('exito').classList.add('show');
+    window.scrollTo(0,0);
+  }).catch(()=>{
+    btn.disabled = false; btn.textContent = 'Enviar mi evaluación';
+    err.textContent = 'No se pudo enviar — revisá tu conexión e intentá de nuevo.';
+  });
+}
+</script>
+<script src="efecto-lupa.js" defer></script>
+</body>
+</html>

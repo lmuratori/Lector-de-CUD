@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KSM — Kinesiología Sistema Muratori</title>
+<style>
+  :root{
+    --verde:#16a34a; --verde-osc:#166534; --azul:#0369a1; --ambar:#b45309;
+    --rojo:#dc2626; --muted:#64748b; --border:#e2e8f0; --bg:#f8fafc; --surface:#fff;
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);margin:0;color:#0f172a;line-height:1.5}
+  .topbar{background:linear-gradient(135deg,var(--verde),var(--verde-osc));color:#fff;padding:22px 20px;text-align:center}
+  .topbar h1{font-size:20px;margin:0 0 4px;font-weight:800}
+  .topbar p{font-size:12.5px;margin:0;opacity:.9}
+  .wrap{max-width:820px;margin:0 auto;padding:18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 12px;color:var(--verde-osc);display:flex;align-items:center;gap:8px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px}
+  input[type=text],input[type=number],input[type=date],select,textarea{
+    width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:7px;font-size:13.5px;font-family:inherit;background:#fff}
+  textarea{min-height:70px;resize:vertical}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  button{cursor:pointer;border:none;border-radius:7px;padding:10px 16px;font-size:13.5px;font-weight:700}
+  .btn-primary{background:var(--verde);color:#fff}
+  .btn-primary:hover{background:var(--verde-osc)}
+  .btn-secundario{background:#f1f5f9;color:#334155}
+  .resultado-item{padding:9px 10px;border:1px solid var(--border);border-radius:7px;margin-bottom:6px;cursor:pointer;font-size:13px}
+  .resultado-item:hover{background:#f0fdf4;border-color:var(--verde)}
+  .paciente-activo{background:#f0fdf4;border:2px solid var(--verde);border-radius:10px;padding:14px;margin-bottom:14px}
+  .paciente-activo b{color:var(--verde-osc)}
+  .alerta{background:#fef2f2;border-left:4px solid var(--rojo);padding:10px 14px;border-radius:0 6px 6px 0;font-size:12.5px;margin-bottom:10px;color:#7f1d1d}
+  .evolucion-item{border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:8px;font-size:12.5px}
+  .evolucion-item .meta{color:var(--muted);font-size:11px;margin-bottom:4px}
+  .pregunta-item{border:1px solid var(--ambar);background:#fffbeb;border-radius:7px;padding:10px 12px;margin-bottom:8px;font-size:12.5px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:700}
+  .badge-pend{background:#fef3c7;color:var(--ambar)}
+  .badge-ok{background:#f0fdf4;color:var(--verde)}
+  .oculto{display:none}
+  .muted{color:var(--muted);font-size:12px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="qrcode-generator.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>🦵 KSM — Kinesiología Sistema Muratori</h1>
+  <p>Seguimiento kinésico conectado con el consultorio del Dr. Luis Alberto Muratori</p>
+  <p style="margin-top:6px"><a href="#" style="color:#fff;text-decoration:underline;font-size:12px" onclick="document.getElementById('cardConfig').classList.remove('oculto');document.getElementById('sheetsUrlInput').value=SHEETS_URL||'';document.getElementById('appTokenInput').value=APP_TOKEN||'';return false;">⚙️ Configuración / token de acceso</a></p>
+</div>
+
+<div class="wrap">
+
+  <!-- Identificación del kinesiólogo (una sola vez por dispositivo) -->
+  <div class="card oculto" id="cardProfesional">
+    <h2>👤 Kinesiólogo/a a cargo</h2>
+    <div class="row">
+      <div><label>Nombre y apellido</label><input type="text" id="profNombre" placeholder="Ej: Lic. Ana Gómez"></div>
+      <div><label>Matrícula</label><input type="text" id="profMatricula" placeholder="Ej: M.P. 1234"></div>
+    </div>
+    <label>Mail (para identificarte en las evoluciones y que el médico pueda responderte directo)</label>
+    <input type="text" id="profEmail" placeholder="tu-mail@ejemplo.com" value="">
+    <p class="muted">Este mail viene precargado con el tuyo (Dr. Muratori) solo para las pruebas de hoy. Cuando un kinesiólogo real instale/abra KSM en su propia computadora, va a borrar esto y poner el suyo — a partir de ahí, ese dispositivo va a usar SIEMPRE su propio mail (queda guardado localmente en ese equipo, no se comparte entre dispositivos).</p>
+    <div class="alerta" style="border-left-color:var(--ambar);background:#fffbeb;color:#78350f" id="cajaConsentimiento">
+      <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;color:#78350f;margin:0">
+        <input type="checkbox" id="aceptaPeaje" style="width:auto;margin-top:3px">
+        <span>Acepto que <b id="peajePctTexto">5%</b> de lo que facture por sesiones cobradas a través del sistema se destina al desarrollo continuo de SIM-M (mantenimiento, IA y demás costos operativos). Si no acepto, no puedo usar KSM.</span>
+      </label>
+    </div>
+    <div style="margin-top:10px"><button class="btn-primary" onclick="guardarProfesional()">Guardar y continuar</button></div>
+    <p class="muted" id="profActualTexto" style="margin-top:8px"></p>
+  </div>
+
+  <!-- Configuración de conexión al backend (una sola vez) -->
+  <div class="card oculto" id="cardConfig">
+    <h2>⚙️ Conexión con el sistema</h2>
+    <p class="muted">Pegá acá la misma URL de implementación que usa OCM (Apps Script → Implementar → Web App).</p>
+    <input type="text" id="sheetsUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+    <div style="margin-top:8px"><button class="btn-primary" onclick="guardarSheetsUrl()">Guardar</button></div>
+    <p class="muted" style="margin-top:14px">Token de acceso (solo si el médico ya lo activó — te lo pasa él por mail o directamente).</p>
+    <input type="text" id="appTokenInput" placeholder="Token (dejar vacío si el médico no lo activó todavía)">
+    <div style="margin-top:8px"><button class="btn-secundario" onclick="guardarAppToken()">Guardar token</button></div>
+  </div>
+
+  <!-- Módulos habilitados por el médico. Antes esto lo elegía cada
+       kinesiólogo/a solo, en su propio dispositivo (localStorage) — ahora
+       lo autoriza el médico desde su Panel de Especialistas, módulo por
+       módulo, y esta tarjeta es de solo lectura. Podoscopía NUNCA aparece
+       acá: es de uso exclusivo del médico, no es un módulo compartible. -->
+  <div class="card oculto" id="cardEntorno">
+    <h2>🔐 Mis módulos habilitados</h2>
+    <p class="muted">Esto ya no lo elegís vos desde acá: lo autoriza el médico desde su Panel de Especialistas, módulo por módulo. Si te falta alguno que necesitás, pedíselo directamente a él.</p>
+    <div id="listaModulosHabilitados" class="muted">Cargando...</div>
+  </div>
+
+  <!-- Facturación del mes (peaje del sistema) -->
+  <div class="card oculto" id="cardFacturacion">
+    <h2>💰 Mi facturación del mes</h2>
+    <div id="resumenFacturacion" class="muted">Cargando...</div>
+    <div style="margin-top:8px"><button class="btn-secundario" onclick="enviarResumenFacturacion()">Enviar resumen al consultorio</button></div>
+  </div>
+
+  <!-- Portada de kinesiología (QR del centro) -->
+  <div class="card oculto" id="cardKinPortada"></div>
+  <div class="card oculto" id="cardKinOrdenes"></div>
+
+  <!-- Búsqueda de paciente -->
+  <div class="card oculto" id="cardBusqueda">
+    <h2>🔍 Buscar paciente</h2>
+    <div class="row" style="grid-template-columns:1fr auto">
+      <input type="text" id="buscarInput" placeholder="Nombre, apellido o DNI" onkeydown="if(event.key==='Enter')buscarPaciente()">
+      <button class="btn-primary" onclick="buscarPaciente()">Buscar</button>
+    </div>
+    <div id="resultadosBusqueda" style="margin-top:10px"></div>
+  </div>
+
+  <!-- Paciente seleccionado -->
+  <div id="panelPaciente" class="oculto"></div>
+
+  <!-- Nueva evolución -->
+  <div class="card oculto" id="cardEvolucion">
+    <h2>📝 Nueva evolución de sesión</h2>
+    <label>Región tratada</label>
+    <select id="evoRegion">
+      <option>Cervical</option><option>Hombro</option><option>Codo</option>
+      <option>Muñeca / Mano</option><option>Columna dorsal</option>
+      <option>Columna lumbar</option><option>Cadera</option>
+      <option>Rodilla</option><option>Tobillo / Pie</option><option>Otra</option>
+    </select>
+    <label>Técnica aplicada</label>
+    <input type="text" id="evoTecnica" placeholder="Ej: Movilización + ejercicios de fuerza">
+    <div class="row">
+      <div><label>EVA dolor — antes de la sesión (0-10)</label><input type="number" id="evoDolorPre" min="0" max="10"></div>
+      <div><label>EVA dolor — después de la sesión (0-10)</label><input type="number" id="evoDolorPost" min="0" max="10"></div>
+    </div>
+    <div class="row">
+      <div><label>Rango de movimiento</label>
+        <select id="evoRom"><option>Mejoró</option><option>Igual</option><option>Empeoró</option></select>
+      </div>
+      <div><label>Tolerancia al ejercicio</label>
+        <select id="evoTolerancia"><option>Buena</option><option>Regular</option><option>Baja / no toleró</option></select>
+      </div>
+    </div>
+    <label>Observaciones</label>
+    <textarea id="evoObservaciones" placeholder="Notas de la sesión..."></textarea>
+    <label>Próxima sesión sugerida</label>
+    <input type="date" id="evoProxima">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+      <input type="checkbox" id="evoEsPaga" style="width:auto" onchange="document.getElementById('evoMontoWrap').style.display=this.checked?'block':'none'">
+      ¿Esta sesión fue paga?
+    </label>
+    <div id="evoMontoWrap" style="display:none">
+      <label>Monto cobrado ($)</label>
+      <input type="number" id="evoMonto" min="0" step="100">
+      <p class="muted" id="evoComisionPreview"></p>
+    </div>
+    <div style="margin-top:12px"><button class="btn-primary" onclick="guardarEvolucion()">Guardar evolución</button></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// Conexión con el backend de S.M.I-M (misma implementación que OCM).
+// Se guarda una sola vez en localStorage de este dispositivo.
+// ══════════════════════════════════════════════════════════════════
+let SHEETS_URL = localStorage.getItem('ksm_sheets_url') || 'https://script.google.com/macros/s/AKfycbwYdoFuU8mQL4YKqufSBQ9AD_yqWEEesLtGzYQjNw2JG1BZIQF7ug80mHB5sLMXhaUpvQ/exec';
+// Token compartido (opcional hasta que el médico corra configurarAppToken()
+// en el backend) — si el médico ya lo activó, hace falta pegarlo acá una
+// vez para que KSM pueda seguir leyendo datos protegidos.
+let APP_TOKEN = localStorage.getItem('ksm_app_token') || '';
+let pacienteActivo = null;
+let ultimoHistorial = null;
+let ultimaVista = null;
+let peajePctVigente = 5;
+// Lo que autorizó el médico para este mail, traído del backend — ya no se
+// arma en este dispositivo. { autorizado:false, modulos:[], registrado:false }
+let permisosVigentes = { autorizado:false, modulos:[], registrado:false };
+const ETIQUETAS_MODULOS_ = { cud:'Discapacidad / CUD', grafica:'Gráfica de evolución del dolor', investigacion:'Cruce con Investigación (OIT)', plantillas:'Seguimiento de Plantillas' };
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+function guardarSheetsUrl(){
+  const v = document.getElementById('sheetsUrlInput').value.trim();
+  if(!v){ toast('Pegá la URL primero'); return; }
+  localStorage.setItem('ksm_sheets_url', v);
+  SHEETS_URL = v;
+  document.getElementById('cardConfig').classList.add('oculto');
+  toast('Conexión guardada');
+  mostrarCardProfesional();
+}
+
+// Trae el % de peaje vigente del sistema y recién ahí muestra la tarjeta
+// del profesional (necesita SHEETS_URL para poder consultarlo).
+function mostrarCardProfesional(){
+  apiGet({action:'get_peaje_sistema_pct'}).then(res=>{
+    peajePctVigente = (res && res.success) ? res.porcentaje : 5;
+    continuarMostrarProfesional();
+  }).catch(()=>{
+    peajePctVigente = 5;
+    continuarMostrarProfesional();
+  });
+}
+function continuarMostrarProfesional(){
+  document.getElementById('peajePctTexto').textContent = peajePctVigente + '%';
+  document.getElementById('cardProfesional').classList.remove('oculto');
+  mostrarProfesionalActual();
+  // Si ya había aceptado exactamente este % en este dispositivo, no lo
+  // hacemos tildar de nuevo — pasa directo a buscar pacientes.
+  const pctAceptado = localStorage.getItem('ksm_prof_pct_aceptado');
+  if(localStorage.getItem('ksm_prof_nombre') && Number(pctAceptado)===Number(peajePctVigente)){
+    document.getElementById('cardBusqueda').classList.remove('oculto');
+    document.getElementById('cardKinPortada').classList.remove('oculto'); renderKinPortada_();
+    document.getElementById('cardFacturacion').classList.remove('oculto');
+    document.getElementById('cardEntorno').classList.remove('oculto');
+    cargarPermisosBackend();
+    cargarResumenFacturacion();
+  }
+}
+
+function guardarProfesional(){
+  const nombre = document.getElementById('profNombre').value.trim();
+  const matricula = document.getElementById('profMatricula').value.trim();
+  const email = document.getElementById('profEmail').value.trim();
+  if(!nombre || !matricula || !email){ toast('Completá nombre, matrícula y mail'); return; }
+  if(!/^\S+@\S+\.\S+$/.test(email)){ toast('El mail no parece válido'); return; }
+  if(!document.getElementById('aceptaPeaje').checked){
+    toast('Para usar KSM hace falta aceptar el % del sistema'); return;
+  }
+  localStorage.setItem('ksm_prof_nombre', nombre);
+  localStorage.setItem('ksm_prof_matricula', matricula);
+  localStorage.setItem('ksm_prof_email', email);
+  localStorage.setItem('ksm_prof_pct_aceptado', peajePctVigente);
+  mostrarProfesionalActual();
+  apiPost({action:'registrar_aceptacion_ksm', nombre, matricula, email, porcentaje:peajePctVigente, tipo:'kinesiologia'}).catch(()=>{});
+  document.getElementById('cardBusqueda').classList.remove('oculto');
+    document.getElementById('cardKinPortada').classList.remove('oculto'); renderKinPortada_();
+  document.getElementById('cardFacturacion').classList.remove('oculto');
+  document.getElementById('cardEntorno').classList.remove('oculto');
+  cargarPermisosBackend();
+  cargarResumenFacturacion();
+  toast('¡Listo! Ya podés buscar pacientes');
+}
+
+// ── Módulos habilitados: ya NO se eligen en este dispositivo. Se leen del
+//    backend (lo que el médico autorizó para este mail desde su Panel de
+//    Especialistas). Podoscopía nunca puede aparecer acá — el backend la
+//    filtra siempre, aunque alguien la mande a mano.
+function cargarPermisosBackend(){
+  const email = localStorage.getItem('ksm_prof_email')||'';
+  if(!email) return;
+  apiGet({action:'get_permisos_especialista', email}).then(res=>{
+    if(!res || !res.success){ permisosVigentes = {autorizado:false, modulos:[], registrado:false}; renderListaModulosHabilitados_(); return; }
+    permisosVigentes = res;
+    renderListaModulosHabilitados_();
+    if(pacienteActivo) cargarPanelPaciente();
+  }).catch(()=>{
+    permisosVigentes = {autorizado:false, modulos:[], registrado:false};
+    renderListaModulosHabilitados_();
+  });
+}
+function renderListaModulosHabilitados_(){
+  const cont = document.getElementById('listaModulosHabilitados');
+  if(!cont) return;
+  if(!permisosVigentes.autorizado){
+    cont.innerHTML = '<span class="badge badge-pend">Pendiente</span> Todavía no tenés ningún módulo extra habilitado por el médico (esto no afecta la búsqueda de pacientes, evoluciones ni preguntas, que siempre funcionan).';
+    return;
+  }
+  const modulos = permisosVigentes.modulos||[];
+  if(!modulos.length){ cont.innerHTML = 'El médico te autorizó, pero todavía no te habilitó ningún módulo extra.'; return; }
+  cont.innerHTML = modulos.map(m=> '<span class="badge badge-ok" style="margin-right:6px;margin-bottom:4px;display:inline-block">' + (ETIQUETAS_MODULOS_[m]||m) + '</span>').join('');
+}
+function modulosActivos_(){
+  const modulos = (permisosVigentes.modulos||[]).map(m=>ETIQUETAS_MODULOS_[m]||m);
+  return modulos.length ? modulos.join(', ') : 'ninguno';
+}
+function tieneModulo_(m){ return !!(permisosVigentes.autorizado && (permisosVigentes.modulos||[]).indexOf(m)>-1); }
+
+function mostrarProfesionalActual(){
+  const nombre = localStorage.getItem('ksm_prof_nombre');
+  const matricula = localStorage.getItem('ksm_prof_matricula');
+  const email = localStorage.getItem('ksm_prof_email');
+  if(nombre && matricula && email){
+    document.getElementById('profActualTexto').textContent = 'Sesión actual: ' + nombre + ' — ' + matricula + ' — ' + email + ' (para cambiar, solo sobreescribí los campos y guardá de nuevo)';
+    document.getElementById('profNombre').value = nombre;
+    document.getElementById('profMatricula').value = matricula;
+    document.getElementById('profEmail').value = email;
+  }
+}
+
+// ── Helpers de red: GET vía querystring, POST con text/plain (evita el
+//    preflight CORS que Apps Script Web Apps no siempre maneja bien) ──
+function apiGet(params){
+  const qs = new URLSearchParams(Object.assign({}, params, APP_TOKEN?{token:APP_TOKEN}:{})).toString();
+  return fetch(SHEETS_URL + '?' + qs).then(r=>r.json());
+}
+function guardarAppToken(){
+  const v = document.getElementById('appTokenInput').value.trim();
+  localStorage.setItem('ksm_app_token', v);
+  APP_TOKEN = v;
+  toast(v ? 'Token guardado' : 'Token borrado');
+}
+function apiPost(payload){
+  return fetch(SHEETS_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({}, payload, APP_TOKEN?{token:APP_TOKEN}:{}))
+  }).then(r=>r.json());
+}
+
+function buscarPaciente(){
+  const q = document.getElementById('buscarInput').value.trim();
+  if(!q){ return; }
+  apiGet({action:'search', query:q}).then(res=>{
+    const cont = document.getElementById('resultadosBusqueda');
+    cont.innerHTML = '';
+    if(!res.success || !res.data.length){ cont.innerHTML = '<p class="muted">Sin resultados.</p>'; return; }
+    res.data.forEach(p=>{
+      const div = document.createElement('div');
+      div.className = 'resultado-item';
+      div.textContent = (p.Apellido||'') + ', ' + (p.Nombre||'') + ' — DNI ' + (p.DNI||'');
+      div.onclick = ()=> seleccionarPaciente(p);
+      cont.appendChild(div);
+    });
+  }).catch(()=> toast('Error de conexión — revisá la URL configurada'));
+}
+
+function seleccionarPaciente(p){
+  pacienteActivo = p;
+  document.getElementById('resultadosBusqueda').innerHTML = '';
+  document.getElementById('buscarInput').value = '';
+  document.getElementById('cardEvolucion').classList.remove('oculto');
+  cargarPanelPaciente();
+}
+
+function cargarPanelPaciente(){
+  const panel = document.getElementById('panelPaciente');
+  panel.classList.remove('oculto');
+  panel.innerHTML = '<div class="paciente-activo"><b>' + (pacienteActivo.Apellido||'') + ', ' + (pacienteActivo.Nombre||'') +
+    '</b> — DNI ' + (pacienteActivo.DNI||'') + '<br><span class="muted">' + (pacienteActivo.Diagnostico_Principal||'Sin diagnóstico cargado') + '</span></div>' +
+    '<div id="alertasKine"></div>' +
+    '<div id="cardKep"></div>' +
+    '<div id="cardPS"></div>' +
+    '<div id="cardKIN"></div>' +
+    '<div class="card"><h2>📈 Evoluciones previas</h2><div id="listaEvoluciones" class="muted">Cargando...</div></div>' +
+    '<div class="card"><h2>💬 Preguntas del paciente</h2><div id="listaPreguntas" class="muted">Cargando...</div></div>' +
+    '<div class="card"><h2>🎥 Videollamada de seguimiento</h2>' +
+    '<div class="row"><div><label>Fecha y hora</label><input type="text" id="meetFechaHora" placeholder="AAAA-MM-DDTHH:MM" value="' + proximaMediaHora_() + '"></div>' +
+    '<div><label>Duración (min)</label><input type="number" id="meetDuracion" value="15" min="5" max="60"></div></div>' +
+    '<label>Mail del paciente para la invitación (opcional)</label>' +
+    '<input type="text" id="meetMailPaciente" value="' + (pacienteActivo.Email||'') + '">' +
+    '<div style="margin-top:10px"><button class="btn-primary" onclick="generarVideollamada()">Generar videollamada</button></div>' +
+    '<div id="meetResultado" class="muted" style="margin-top:8px"></div></div>' +
+    '<div class="card"><h2>📤 Informe de adherencia y progreso — para el médico</h2>' +
+    '<p class="muted">Junta las evoluciones y las autoevaluaciones del paciente en un resumen y lo manda por mail al Dr. Muratori, con tu mail como respuesta directa.</p>' +
+    '<div id="previewInforme" class="muted" style="margin:10px 0"></div>' +
+    '<button class="btn-secundario" onclick="previsualizarInforme()">Generar resumen</button> ' +
+    '<button class="btn-primary" onclick="enviarInforme()">Enviar informe al médico</button></div>' +
+    renderModulosOpcionales_();
+
+  apiGet({action:'get_historial', dni: pacienteActivo.DNI}).then(res=>{
+    if(!res.success) return;
+    ultimoHistorial = res;
+    renderEvoluciones(res.kinesiologia||[]);
+    renderAlerta(res.evaluaciones||[]);
+    if(tieneModulo_('grafica')) dibujarGraficaDolor_(res.kinesiologia||[]);
+  });
+  apiGet({action:'get_preguntas_kine', dni: pacienteActivo.DNI}).then(res=>{
+    renderPreguntas(res.preguntas||[]);
+  }).catch(()=>{
+    document.getElementById('listaPreguntas').innerHTML = '<p class="muted">Todavía no se aplicó el patch del canal de preguntas en el backend.</p>';
+  });
+  const emailProfActual = localStorage.getItem('ksm_prof_email')||'';
+  cargarKep_();
+  cargarPSK_();
+  cargarKIN_();
+  if(tieneModulo_('cud')){
+    apiGet({action:'get_discapacidad_paciente', dni: pacienteActivo.DNI, profesionalEmail: emailProfActual}).then(res=>{
+      renderDiscapacidad_(res);
+    }).catch(()=>{});
+  }
+  if(tieneModulo_('investigacion')){
+    apiGet({action:'get_investigacion_paciente', dni: pacienteActivo.DNI, profesionalEmail: emailProfActual}).then(res=>{
+      renderInvestigacion_(res);
+    }).catch(()=>{});
+  }
+  if(tieneModulo_('plantillas')){
+    apiGet({action:'get_plantillas_paciente', dni: pacienteActivo.DNI, profesionalEmail: emailProfActual}).then(res=>{
+      renderPlantillas_(res);
+    }).catch(()=>{});
+  }
+}
+
+// ── Módulos habilitados por el médico — construye las tarjetas según lo
+//    que devolvió el backend (permisosVigentes.modulos), no una elección
+//    local. Podoscopía nunca tiene tarjeta acá: no es un módulo compartible.
+function renderModulosOpcionales_(){
+  let html = '';
+  if(tieneModulo_('cud')) html += '<div class="card" id="cardDiscapacidadPac"><h2>🦽 Discapacidad / CUD</h2><div class="muted">Cargando...</div></div>';
+  if(tieneModulo_('grafica')) html += '<div class="card"><h2>📊 Evolución del dolor</h2><canvas id="graficaDolor" height="140"></canvas></div>';
+  if(tieneModulo_('investigacion')) html += '<div class="card" id="cardInvestigacionPac"><h2>🔬 Investigación (cruce OIT)</h2><div class="muted">Cargando...</div></div>';
+  if(tieneModulo_('plantillas')) html += '<div class="card" id="cardPlantillasPac"><h2>👟 Plantillas</h2><div class="muted">Cargando...</div></div>';
+  return html;
+}
+function renderDiscapacidad_(res){
+  const cont = document.getElementById('cardDiscapacidadPac');
+  if(!cont) return;
+  if(!res || !res.success){ cont.querySelector('div').innerHTML = 'No autorizado o sin datos todavía.'; return; }
+  const discapacidad = res.discapacidad||[];
+  if(!discapacidad.length){
+    cont.querySelector('div').innerHTML = 'Sin registros de discapacidad/CUD sincronizados todavía para este paciente.';
+    return;
+  }
+  cont.querySelector('div').innerHTML = discapacidad.map(d=>
+    '<div class="evolucion-item">' + (d.tipo||'') + (d.subtipo?(' — '+d.subtipo):'') + '<br>' +
+    '<span class="muted">' + (d.diagnostico||'') + (d.codigos_cif?(' — CIF: '+d.codigos_cif):'') + '</span></div>'
+  ).join('');
+}
+function renderInvestigacion_(res){
+  const cont = document.getElementById('cardInvestigacionPac');
+  if(!cont) return;
+  if(!res || !res.success){ cont.querySelector('div').innerHTML = 'No autorizado o sin datos todavía.'; return; }
+  if(res.mensaje){ cont.querySelector('div').innerHTML = '<span class="muted">' + res.mensaje + '</span>'; return; }
+  const hallazgos = res.hallazgos||[];
+  const hidricos = res.hallazgos_hidricos||[];
+  if(!hallazgos.length && !hidricos.length){
+    cont.querySelector('div').innerHTML = '<span class="muted">Sin coincidencias por localidad ni por afluente/canal de riego para este paciente.</span>';
+    return;
+  }
+  let html = '<p class="muted" style="margin-bottom:8px">Cruce por reglas — alerta para revisar, no confirma relación causal.</p>';
+  html += hallazgos.map(h=>
+    '<div class="evolucion-item"><b>' + h.categoria + '</b> — ' + h.diagnostico + '<br>' +
+    '<span class="muted">Empresa: ' + h.empresa + ' · Agentes: ' + h.agentes.join(', ') + '</span></div>'
+  ).join('');
+  if(hidricos.length){
+    html += '<div class="meta" style="margin-top:8px">💧 Vía hídrica/riego (afluente: ' + (res.afluente||'') + ')</div>';
+    html += hidricos.map(h=>
+      '<div class="evolucion-item"><b>' + h.categoria + '</b><br>' +
+      '<span class="muted">Empresa: ' + h.empresa + ' · Canal: ' + h.afluente + '</span></div>'
+    ).join('');
+  }
+  cont.querySelector('div').innerHTML = html;
+}
+function renderPlantillas_(res){
+  const cont = document.getElementById('cardPlantillasPac');
+  if(!cont) return;
+  if(!res || !res.success){ cont.querySelector('div').innerHTML = 'No autorizado o sin datos todavía.'; return; }
+  const plantillas = res.plantillas||[];
+  if(!plantillas.length){ cont.querySelector('div').innerHTML = '<span class="muted">Sin pedidos de plantillas para este paciente.</span>'; return; }
+  cont.querySelector('div').innerHTML = plantillas.map(p=>
+    '<div class="evolucion-item">N° ' + (p.nSerie||'') + ' — <b>' + (p.estado||'') + '</b><br>' +
+    '<span class="muted">' + (p.detalle||'') + '</span></div>'
+  ).join('');
+}
+function dibujarGraficaDolor_(evoluciones){
+  const canvas = document.getElementById('graficaDolor');
+  if(!canvas || typeof Chart==='undefined') return;
+  const ordenadas = evoluciones.map(e=>{
+    let v={}; try{ v = JSON.parse(e.Valores_JSON||e.Vals_JSON||'{}'); }catch(_){}
+    return {fecha: e.Timestamp, pre: v.dolorPre, post: v.dolorPost};
+  }).filter(e=> e.pre!==undefined).sort((a,b)=> new Date(a.fecha)-new Date(b.fecha));
+  if(!ordenadas.length) return;
+  new Chart(canvas, {
+    type:'line',
+    data:{
+      labels: ordenadas.map(e=> new Date(e.fecha).toLocaleDateString('es-AR')),
+      datasets:[
+        {label:'Dolor antes de la sesión', data: ordenadas.map(e=>e.pre), borderColor:'#dc2626', tension:.3},
+        {label:'Dolor después de la sesión', data: ordenadas.map(e=>e.post), borderColor:'#16a34a', tension:.3}
+      ]
+    },
+    options:{scales:{y:{min:0,max:10}}, plugins:{legend:{position:'bottom'}}}
+  });
+}
+
+function renderEvoluciones(lista){
+  const cont = document.getElementById('listaEvoluciones');
+  if(!lista.length){ cont.innerHTML = '<p class="muted">Sin evoluciones cargadas todavía.</p>'; return; }
+  lista.sort((a,b)=> new Date(b.Timestamp) - new Date(a.Timestamp));
+  cont.innerHTML = lista.map(e=>{
+    let vals = {};
+    try{ vals = JSON.parse(e.Valores_JSON || e.Vals_JSON || '{}'); }catch(_){}
+    return '<div class="evolucion-item"><div class="meta">' + new Date(e.Timestamp).toLocaleString('es-AR') + ' — ' + (e.Region||'') + '</div>' +
+      (vals.tecnica ? ('Técnica: ' + vals.tecnica + '<br>') : '') +
+      (vals.dolorPre!==undefined ? ('Dolor: ' + vals.dolorPre + ' → ' + vals.dolorPost + '<br>') : '') +
+      (vals.observaciones ? vals.observaciones : '') + '</div>';
+  }).join('');
+}
+
+function renderAlerta(evaluaciones){
+  const cont = document.getElementById('alertasKine');
+  const propias = evaluaciones.filter(e=> e.Profesional==='kinesiologo')
+    .sort((a,b)=> new Date(b.Timestamp) - new Date(a.Timestamp));
+  if(propias.length < 2){ cont.innerHTML=''; return; }
+  let v1={}, v0={};
+  try{ v1 = JSON.parse(propias[0].Valores_JSON||'{}'); v0 = JSON.parse(propias[1].Valores_JSON||'{}'); }catch(_){}
+  if(v1.dolor!==undefined && v0.dolor!==undefined && (v1.dolor - v0.dolor) >= 3){
+    cont.innerHTML = '<div class="alerta">🔴 El dolor autoinformado por el paciente subió ' + (v1.dolor - v0.dolor) + ' puntos desde la última autoevaluación. Revisar antes de continuar el plan.</div>';
+  } else {
+    cont.innerHTML = '';
+  }
+}
+
+function renderPreguntas(lista){
+  const cont = document.getElementById('listaPreguntas');
+  const pendientes = lista.filter(p=>p.Estado!=='respondida');
+  if(!pendientes.length){ cont.innerHTML = '<p class="muted">Sin preguntas pendientes.</p>'; return; }
+  cont.innerHTML = pendientes.map(p=>
+    '<div class="pregunta-item"><span class="badge badge-pend">Pendiente</span><br>' +
+    '<b>' + new Date(p.Timestamp).toLocaleDateString('es-AR') + ':</b> ' + p.Pregunta + '<br>' +
+    '<textarea id="resp_' + p._row + '" placeholder="Escribí la respuesta..."></textarea>' +
+    '<button class="btn-primary" style="margin-top:6px" onclick="responderPregunta(' + p._row + ')">Enviar respuesta por mail</button></div>'
+  ).join('');
+}
+
+function responderPregunta(fila){
+  const texto = document.getElementById('resp_' + fila).value.trim();
+  if(!texto){ toast('Escribí una respuesta primero'); return; }
+  const kinesiologoEmail = localStorage.getItem('ksm_prof_email')||'';
+  const kinesiologoNombre = localStorage.getItem('ksm_prof_nombre')||'';
+  apiPost({action:'kine_pregunta_responder', fila: fila, respuesta: texto, kinesiologoEmail: kinesiologoEmail, kinesiologoNombre: kinesiologoNombre}).then(res=>{
+    if(res.success){ toast('Respuesta enviada por mail'); cargarPanelPaciente(); }
+    else toast('Error: ' + (res.error||'desconocido'));
+  });
+}
+
+function guardarEvolucion(){
+  if(!pacienteActivo){ toast('Seleccioná un paciente primero'); return; }
+  const nombreProf = localStorage.getItem('ksm_prof_nombre')||'';
+  const matriculaProf = localStorage.getItem('ksm_prof_matricula')||'';
+  const emailProf = localStorage.getItem('ksm_prof_email')||'';
+  const vals = {
+    kinesiologo: nombreProf + ' — ' + matriculaProf,
+    kinesiologoEmail: emailProf,
+    tecnica: document.getElementById('evoTecnica').value.trim(),
+    dolorPre: Number(document.getElementById('evoDolorPre').value)||0,
+    dolorPost: Number(document.getElementById('evoDolorPost').value)||0,
+    rom: document.getElementById('evoRom').value,
+    tolerancia: document.getElementById('evoTolerancia').value,
+    observaciones: document.getElementById('evoObservaciones').value.trim(),
+    proximaSesion: document.getElementById('evoProxima').value
+  };
+  apiPost({
+    action:'kine_evolucion',
+    dni: pacienteActivo.DNI,
+    paciente: (pacienteActivo.Apellido||'') + ', ' + (pacienteActivo.Nombre||''),
+    region: document.getElementById('evoRegion').value,
+    vals: vals
+  }).then(res=>{
+    if(res.success){
+      toast('Evolución guardada');
+      const esPaga = document.getElementById('evoEsPaga').checked;
+      const monto = Number(document.getElementById('evoMonto').value)||0;
+      const cerrar = ()=>{
+        ['evoTecnica','evoDolorPre','evoDolorPost','evoObservaciones','evoProxima','evoMonto'].forEach(id=>document.getElementById(id).value='');
+        document.getElementById('evoEsPaga').checked = false;
+        document.getElementById('evoMontoWrap').style.display = 'none';
+        cargarPanelPaciente();
+        cargarResumenFacturacion();
+      };
+      if(esPaga && monto>0){
+        apiPost({
+          action:'registrar_facturacion_sistema',
+          dni: pacienteActivo.DNI,
+          paciente: (pacienteActivo.Apellido||'') + ', ' + (pacienteActivo.Nombre||''),
+          profesionalNombre: nombreProf,
+          profesionalEmail: emailProf,
+          monto: monto
+        }).then(r2=>{
+          if(r2.success) toast('Sesión guardada — peaje del sistema: $' + r2.comision + ' (' + r2.porcentaje + '%)');
+          cerrar();
+        }).catch(cerrar);
+      } else {
+        cerrar();
+      }
+    } else {
+      toast('Error al guardar: ' + (res.error||'desconocido'));
+    }
+  }).catch(()=> toast('Error de conexión'));
+}
+
+// ═════════════════════════════════════════════════════════════════
+// KEP — Evaluador de parámetros kinésicos (paciente ↔ kinesiólogo ↔ médico)
+// Calcado del circuito de RMYT que usa el médico: el paciente carga su
+// evaluación semanal desde un link, el sistema arma un semáforo, el
+// kinesiólogo suma sus mediciones objetivas y, si hace falta, DERIVA al
+// médico (que responde desde la pestaña "Kinesiología" del Seguimiento
+// de OCM). El semáforo es una ayuda: no diagnostica.
+// ═════════════════════════════════════════════════════════════════
+let ultimoKep = null;
+function kepEsc_(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const KEP_ALERTAS_TXT_ = {
+  BANDERAS_ROJAS:'Señales de alerta marcadas por el paciente (combinación o signo grave)', BANDERA_A_REVISAR:'Una señal de alerta marcada por el paciente',
+  DOLOR_EN_AUMENTO:'Dolor en movimiento en aumento', FUNCION_EMPEORA:'La función (PSFS) empeora', PEOR_PERCIBIDO:'El paciente se siente peor',
+  BAJO_CUMPLIMIENTO:'Bajo cumplimiento del plan', NO_TOLERA_EJERCICIOS:'No tolera los ejercicios (2 semanas seguidas)'
+};
+const KEP_BANDERAS_TXT_ = {
+  noche_progresivo:'Dolor nocturno / que no cede, en aumento', fuerza_progresiva:'Pérdida de fuerza progresiva', neuro_aumento:'Hormigueo / adormecimiento en aumento',
+  esfinteres_silla:'Alteración de esfínteres o anestesia en silla de montar', fiebre:'Fiebre / malestar general', hinchazon_caliente:'Hinchazón, calor y enrojecimiento nuevos', caida_golpe:'Caída o golpe nuevo'
+};
+function kepChip_(nivel){
+  const m = {verde:['#16a34a','🟢 Verde'], amarillo:['#d97706','🟡 A revisar'], rojo:['#dc2626','🔴 Alerta']}[nivel];
+  return m ? '<span style="display:inline-block;padding:3px 12px;border-radius:999px;font-weight:800;font-size:12px;color:#fff;background:'+m[0]+'">'+m[1]+'</span>' : '';
+}
+function kepAlertasTxt_(a){ return String(a||'').split('+').map(x=>x.trim()).filter(Boolean).map(x=>KEP_ALERTAS_TXT_[x]||x.replace(/_/g,' ')).join(' · '); }
+function kepFecha_(f){ try{ return new Date(f).toLocaleDateString('es-AR'); }catch(_){ return ''; } }
+
+function cargarKep_(){
+  const cont = document.getElementById('cardKep');
+  if(!cont || !pacienteActivo) return;
+  cont.innerHTML = '<div class="card"><h2>🧭 Evaluador KEP — parámetros kinésicos</h2><div class="muted">Cargando…</div></div>';
+  apiGet({action:'get_kep', dni: pacienteActivo.DNI}).then(res=>{
+    if(!res || !res.success){
+      cont.innerHTML = '<div class="card"><h2>🧭 Evaluador KEP — parámetros kinésicos</h2><p class="muted">' + kepEsc_((res&&res.error)||'Todavía no se aplicó la versión 18 del backend (Codigo.gs).') + '</p></div>';
+      return;
+    }
+    ultimoKep = res;
+    renderKep_(res);
+  }).catch(()=>{
+    cont.innerHTML = '<div class="card"><h2>🧭 Evaluador KEP — parámetros kinésicos</h2><p class="muted">Todavía no se aplicó la versión 18 del backend (Codigo.gs) o no hay conexión.</p></div>';
+  });
+}
+
+function renderKep_(k){
+  const cont = document.getElementById('cardKep');
+  const ev = k.evaluaciones || [];
+  const u = ev[0];
+  let h = '<div class="card"><h2>🧭 Evaluador KEP — parámetros kinésicos</h2>';
+  if(!u){
+    h += '<p class="muted">El paciente todavía no cargó ninguna evaluación semanal. Enviale el link desde abajo.</p>';
+  } else {
+    h += '<div style="margin-bottom:8px">' + kepChip_(u.nivel) + ' <span class="muted">última evaluación: ' + kepFecha_(u.fecha) + (k.dias_desde_ultima!=null ? ' (hace ' + k.dias_desde_ultima + ' días)' : '') + ' · ' + ev.length + ' cargadas</span></div>';
+    if(k.sin_respuesta) h += '<div class="alerta" style="border-left-color:var(--ambar);background:#fffbeb;color:#78350f">⏰ Hace más de ' + k.umbrales.dias_sin_respuesta + ' días que el paciente no carga su evaluación.</div>';
+    if(u.alerta) h += '<div class="alerta">' + (u.nivel==='rojo'?'🔴 ':'🟡 ') + kepEsc_(kepAlertasTxt_(u.alerta)) + '</div>';
+    if(u.banderas && u.banderas.length) h += '<div class="muted" style="margin-bottom:6px">🚩 ' + u.banderas.map(b=>kepEsc_(KEP_BANDERAS_TXT_[b]||b)).join(' · ') + '</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px">' +
+      [['EVA reposo',u.eva_reposo],['EVA movimiento',u.eva_mov],['PSFS (0-10)',u.psfs],['Cumplimiento',u.cump],['Percepción',u.cambio||'—'],['Tolerancia',u.tolerancia||'—']].map(p=>
+        '<div style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;min-width:92px"><div class="muted">' + p[0] + '</div><div style="font-weight:800;font-size:16px">' + (p[1]==null?'—':kepEsc_(p[1])) + '</div></div>').join('') + '</div>';
+    if(k.tendencia && k.tendencia.estado && k.tendencia.estado!=='datos_insuficientes'){
+      h += '<div class="evolucion-item">📈 ' + kepEsc_(k.tendencia.mensaje) + (k.tendencia.discordancia && k.tendencia.mensaje_discordancia ? '<br>↔️ ' + kepEsc_(k.tendencia.mensaje_discordancia) : '') +
+        '<div class="muted" style="margin-top:4px">Estimación simple (pendiente semanal); no reemplaza el criterio clínico.</div></div>';
+    }
+    h += '<canvas id="kepGrafica" height="120" style="margin:8px 0"></canvas>';
+    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="text-align:left;color:var(--muted)"><th>Fecha</th><th>EVA mov.</th><th>PSFS</th><th>Percepción</th><th>Semáforo</th></tr>' +
+      ev.slice(0,6).map(e=>'<tr style="border-top:1px solid var(--border)"><td>' + kepFecha_(e.fecha) + '</td><td>' + (e.eva_mov==null?'—':e.eva_mov) + '</td><td>' + (e.psfs==null?'—':e.psfs) + '</td><td>' + kepEsc_(e.cambio||'—') + '</td><td>' + kepChip_(e.nivel) + '</td></tr>').join('') + '</table></div>';
+  }
+  h += '<p class="muted" style="margin-top:8px">Criterios del semáforo: dolor en movimiento +' + k.umbrales.eva + ' puntos o más, PSFS −' + k.umbrales.psfs + ' puntos o más, señales de alerta (rojo si hay signo grave o dos juntas). Es una ayuda: no diagnostica.</p>';
+
+  // Mediciones objetivas del kinesiólogo
+  const m = (k.mediciones||[]);
+  h += '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0"><h2 style="font-size:14px">📐 Mediciones objetivas del kinesiólogo</h2>';
+  if(m.length){
+    const a = m[0], b = m[1];
+    const delta = (cur, prev)=> (prev==null||cur==null) ? '' : (' <span class="muted">(' + (cur-prev>=0?'+':'') + (Math.round((cur-prev)*10)/10) + ' vs. anterior)</span>');
+    let t = '<div class="evolucion-item"><div class="meta">' + kepFecha_(a.fecha) + ' — ' + kepEsc_(a.region) + (a.kinesiologo?' — '+kepEsc_(a.kinesiologo):'') + '</div>';
+    (a.rom||[]).forEach(x=>{ const p = b && (b.rom||[]).find(y=>y.mov===x.mov && y.lado===x.lado); t += 'Rango · ' + kepEsc_(x.mov) + ' ' + kepEsc_(x.lado) + ': <b>' + kepEsc_(x.grados) + '°</b>' + delta(x.grados, p?p.grados:null) + '<br>'; });
+    (a.fuerza||[]).forEach(x=>{ const p = b && (b.fuerza||[]).find(y=>y.musculo===x.musculo && y.lado===x.lado); t += 'Fuerza · ' + kepEsc_(x.musculo) + ' ' + kepEsc_(x.lado) + ': <b>' + kepEsc_(x.mrc) + '/5</b>' + delta(x.mrc, p?p.mrc:null) + '<br>'; });
+    if(a.test) t += 'Test funcional: ' + kepEsc_(a.test) + '<br>';
+    if(a.observaciones) t += kepEsc_(a.observaciones);
+    h += t + '</div>';
+  } else h += '<p class="muted">Todavía no cargaste mediciones de este paciente.</p>';
+  h += '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;font-size:13px">➕ Cargar nuevas mediciones</summary>' +
+    '<label>Región</label><select id="kepMedRegion">' + ['Cervical','Hombro','Codo','Muñeca / Mano','Columna dorsal','Columna lumbar','Cadera','Rodilla','Tobillo / Pie','Otra'].map(r=>'<option>'+r+'</option>').join('') + '</select>' +
+    '<label>Rango articular (goniometría, en grados)</label><div id="kepRomFilas"></div><button type="button" class="btn-secundario" onclick="kepFilaRom_()">+ Agregar movimiento</button>' +
+    '<label>Fuerza muscular (escala MRC/Daniels 0-5: 0 sin contracción · 3 vence la gravedad · 5 fuerza normal)</label><div id="kepFzaFilas"></div><button type="button" class="btn-secundario" onclick="kepFilaFza_()">+ Agregar músculo</button>' +
+    '<label>Test funcional (opcional)</label><input type="text" id="kepMedTest" placeholder="Ej: Sentarse y pararse 30 s: 9 repeticiones">' +
+    '<label>Observaciones (opcional)</label><textarea id="kepMedObs"></textarea>' +
+    '<div style="margin-top:8px"><button class="btn-primary" onclick="kepGuardarMedicion_()">Guardar mediciones</button></div></details>';
+
+  // Link al paciente
+  h += '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0"><h2 style="font-size:14px">📲 Evaluación semanal del paciente</h2>' +
+    '<p class="muted">El paciente la completa desde su celular, sin usuario ni clave (2 minutos). Si algo marca rojo, le llega un aviso a vos y al médico.</p>' +
+    '<label>Región que se está tratando</label><select id="kepLinkRegion">' + ['Cervical','Hombro','Codo','Muñeca / Mano','Columna dorsal','Columna lumbar','Cadera','Rodilla','Tobillo / Pie','Otra'].map(r=>'<option>'+r+'</option>').join('') + '</select>' +
+    '<label>Mail del paciente</label><input type="text" id="kepLinkMail" value="' + kepEsc_(pacienteActivo.Email||'') + '">' +
+    '<div style="margin-top:8px"><button class="btn-primary" onclick="kepEnviarLink_(true)">Enviar link por mail</button> <button class="btn-secundario" onclick="kepEnviarLink_(false)">Solo copiar el link</button></div>' +
+    '<div id="kepLinkRes" class="muted" style="margin-top:8px">' + (k.seguimiento ? ('Último link: ' + kepFecha_(k.seguimiento.ultimo_link) + (k.seguimiento.kinesiologo?' — '+kepEsc_(k.seguimiento.kinesiologo):'')) : '') + '</div>';
+
+  // Derivación al médico
+  h += '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0"><h2 style="font-size:14px">🩺 Consulta / derivación al médico</h2>';
+  (k.derivaciones||[]).slice(0,3).forEach(d=>{
+    h += '<div class="evolucion-item"><div class="meta">' + kepFecha_(d.fecha) + ' · ' + (d.estado==='respondida' ? '<span class="badge badge-ok">Respondida</span>' : '<span class="badge badge-pend">Pendiente</span>') + '</div>' +
+      '<b>Tu consulta:</b> ' + kepEsc_(d.motivo) + (d.respuesta ? '<br><b>Indicación del Dr. Muratori:</b> ' + kepEsc_(d.respuesta) : '') + '</div>';
+  });
+  h += '<label>Motivo (qué necesitás que el médico vea o indique)</label><textarea id="kepDerivMotivo" placeholder="Ej: dolor en aumento pese a 4 semanas de tratamiento; evaluar estudios por imágenes"></textarea>' +
+    '<div style="margin-top:8px"><button class="btn-primary" onclick="kepDerivar_()">Derivar al médico</button></div>' +
+    '<p class="muted" style="margin-top:6px">Se manda por mail al consultorio con el resumen de la evolución (EVA, PSFS, mediciones y alertas) y queda en el Seguimiento de OCM. La respuesta médica te llega por mail.</p></div>';
+
+  cont.innerHTML = h;
+  kepFilaRom_(); kepFilaFza_();
+  kepDibujarGrafica_(ev);
+}
+
+function kepDibujarGrafica_(ev){
+  try{
+    const c = document.getElementById('kepGrafica');
+    if(!c || typeof Chart === 'undefined' || ev.length < 2) { if(c) c.style.display='none'; return; }
+    const cron = ev.slice().reverse();
+    new Chart(c, { type:'line',
+      data:{ labels: cron.map(e=>kepFecha_(e.fecha)),
+        datasets:[ { label:'EVA en movimiento (0-10)', data: cron.map(e=>e.eva_mov), borderColor:'#dc2626', backgroundColor:'#dc2626', tension:.25, spanGaps:true },
+                   { label:'PSFS (0-10, más alto = mejor)', data: cron.map(e=>e.psfs), borderColor:'#16a34a', backgroundColor:'#16a34a', tension:.25, spanGaps:true } ] },
+      options:{ responsive:true, scales:{ y:{ min:0, max:10 } }, plugins:{ legend:{ position:'bottom' } } } });
+  }catch(_){}
+}
+
+function kepFilaRom_(){
+  const cont = document.getElementById('kepRomFilas'); if(!cont) return;
+  const d = document.createElement('div'); d.className = 'row'; d.style.cssText = 'grid-template-columns:2fr 1fr 1fr;margin-bottom:6px';
+  d.innerHTML = '<input type="text" class="kep-rom-mov" placeholder="Movimiento (ej: Flexión de rodilla)"><select class="kep-rom-lado"><option>Derecho</option><option>Izquierdo</option><option>Bilateral</option><option>—</option></select><input type="number" class="kep-rom-gr" min="0" max="360" placeholder="Grados">';
+  cont.appendChild(d);
+}
+function kepFilaFza_(){
+  const cont = document.getElementById('kepFzaFilas'); if(!cont) return;
+  const d = document.createElement('div'); d.className = 'row'; d.style.cssText = 'grid-template-columns:2fr 1fr 1fr;margin-bottom:6px';
+  d.innerHTML = '<input type="text" class="kep-fz-mus" placeholder="Músculo / grupo (ej: Cuádriceps)"><select class="kep-fz-lado"><option>Derecho</option><option>Izquierdo</option><option>Bilateral</option><option>—</option></select><select class="kep-fz-mrc"><option value="">MRC</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>';
+  cont.appendChild(d);
+}
+function kepGuardarMedicion_(){
+  if(!pacienteActivo){ toast('Seleccioná un paciente primero'); return; }
+  const rom = Array.from(document.querySelectorAll('#kepRomFilas .row')).map(r=>({ mov:r.querySelector('.kep-rom-mov').value.trim(), lado:r.querySelector('.kep-rom-lado').value, grados:r.querySelector('.kep-rom-gr').value })).filter(x=>x.mov && x.grados!=='');
+  const fuerza = Array.from(document.querySelectorAll('#kepFzaFilas .row')).map(r=>({ musculo:r.querySelector('.kep-fz-mus').value.trim(), lado:r.querySelector('.kep-fz-lado').value, mrc:r.querySelector('.kep-fz-mrc').value })).filter(x=>x.musculo && x.mrc!=='');
+  const test = document.getElementById('kepMedTest').value.trim(), obs = document.getElementById('kepMedObs').value.trim();
+  if(!rom.length && !fuerza.length && !test && !obs){ toast('Cargá al menos una medición'); return; }
+  apiPost({ action:'kep_medicion', dni:pacienteActivo.DNI, region:document.getElementById('kepMedRegion').value, rom:rom, fuerza:fuerza, test:test, observaciones:obs,
+    kinesiologoNombre:localStorage.getItem('ksm_prof_nombre')||'', kinesiologoEmail:localStorage.getItem('ksm_prof_email')||'' }).then(res=>{
+    if(res.success){ toast('Mediciones guardadas'); cargarKep_(); } else toast('Error: ' + (res.error||'desconocido'));
+  }).catch(()=> toast('Error de conexión'));
+}
+function kepEnviarLink_(enviarMail){
+  if(!pacienteActivo){ toast('Seleccioná un paciente primero'); return; }
+  apiPost({ action:'kep_enviar_link', dni:pacienteActivo.DNI, region:document.getElementById('kepLinkRegion').value, emailPaciente:document.getElementById('kepLinkMail').value.trim(), enviarMail:!!enviarMail,
+    kinesiologoNombre:localStorage.getItem('ksm_prof_nombre')||'', kinesiologoEmail:localStorage.getItem('ksm_prof_email')||'' }).then(res=>{
+    const out = document.getElementById('kepLinkRes');
+    if(res.link && out){
+      out.innerHTML = (res.success ? '✅ ' + kepEsc_(res.message) + '.' : '⚠️ ' + kepEsc_(res.error||'')) + '<br>Link: <a href="' + kepEsc_(res.link) + '" target="_blank" rel="noopener">' + kepEsc_(res.link) + '</a>';
+      try{ navigator.clipboard.writeText(res.link).then(()=>toast('Link copiado')).catch(()=>{}); }catch(_){}
+    } else toast(res.success ? (res.message||'Listo') : ('Error: ' + (res.error||'desconocido')));
+  }).catch(()=> toast('Error de conexión'));
+}
+function kepResumenParaMedico_(){
+  const k = ultimoKep; if(!k) return '';
+  const u = (k.evaluaciones||[])[0];
+  let t = 'Paciente: ' + (pacienteActivo.Apellido||'') + ', ' + (pacienteActivo.Nombre||'') + ' — DNI ' + (pacienteActivo.DNI||'') + '\n';
+  if(u){
+    t += 'Última autoevaluación (' + kepFecha_(u.fecha) + '): EVA reposo ' + (u.eva_reposo==null?'—':u.eva_reposo) + ', EVA movimiento ' + (u.eva_mov==null?'—':u.eva_mov) + ', PSFS ' + (u.psfs==null?'—':u.psfs) + '/10, cumplimiento ' + (u.cump==null?'—':u.cump) + '/10, percepción: ' + (u.cambio||'—') + '.\n';
+    if(u.alerta) t += 'Semáforo ' + (u.nivel||'') + ': ' + kepAlertasTxt_(u.alerta) + '.\n';
+    if(u.banderas && u.banderas.length) t += 'Señales de alerta marcadas: ' + u.banderas.map(b=>KEP_BANDERAS_TXT_[b]||b).join('; ') + '.\n';
+  }
+  if(k.tendencia && k.tendencia.mensaje && k.tendencia.estado!=='datos_insuficientes') t += 'Tendencia (estimación): ' + k.tendencia.mensaje + '\n';
+  const m = (k.mediciones||[])[0];
+  if(m){
+    t += 'Mediciones del kinesiólogo (' + kepFecha_(m.fecha) + '): ' + [].concat((m.rom||[]).map(x=>x.mov+' '+x.lado+' '+x.grados+'°'), (m.fuerza||[]).map(x=>x.musculo+' '+x.lado+' '+x.mrc+'/5')).join('; ') + (m.test ? '. Test: ' + m.test : '') + '.\n';
+  }
+  return t;
+}
+function kepDerivar_(){
+  if(!pacienteActivo){ toast('Seleccioná un paciente primero'); return; }
+  const motivo = document.getElementById('kepDerivMotivo').value.trim();
+  if(!motivo){ toast('Escribí el motivo de la derivación'); return; }
+  const kEmail = localStorage.getItem('ksm_prof_email')||'';
+  if(!kEmail){ toast('Cargá tu mail en "Mis datos" para que el médico pueda responderte'); return; }
+  apiPost({ action:'kep_derivar_medico', dni:pacienteActivo.DNI, motivo:motivo, resumen:kepResumenParaMedico_(),
+    kinesiologoNombre:localStorage.getItem('ksm_prof_nombre')||'', kinesiologoEmail:kEmail }).then(res=>{
+    if(res.success){ toast(res.message||'Derivación enviada'); cargarKep_(); } else toast('Error: ' + (res.error||'desconocido'));
+  }).catch(()=> toast('Error de conexión'));
+}
+
+
+
+// ═════════════════════════════════════════════════════════════════
+// PÁGINA DE SALUD — Clave C (estrategia kinésica del equipo)
+// El RMYT del médico emite la Clave A. La Clave C la entrega el GRUPO DE
+// KINESIOLOGÍA solo si trata al paciente: se suma al mismo código si ya
+// tiene uno. Si el paciente se trata con otro profesional, la página solo
+// le muestra una idea general. A la página no viaja ningún dato personal.
+// ═════════════════════════════════════════════════════════════════
+let pskTemas = [], pskAccesos = [], pskError = '';
+const PSK_PALABRAS = {
+  'lumbalgia-ciatica':['lumbalgia','ciatica','lumbociatalgia','dolor lumbar'],
+  'hernia-disco-cervical-dorsal-lumbar':['hernia de disco','hernia discal','hernia cervical','hernia lumbar'],
+  'cervicalgia-cervicobraquialgia':['cervicalgia','cervicobraquialgia','dolor cervical'],
+  'esguince-cervical-latigazo':['latigazo'],'esguince-tobillo':['esguince de tobillo','esguince tobillo'],
+  'artrosis':['artrosis','gonartrosis','coxartrosis','osteoartritis'],
+  'fascitis-plantar':['fascitis plantar','talalgia'],'hombro-congelado-capsulitis-adhesiva':['hombro congelado','capsulitis'],
+  'lesion-manguito-rotador':['manguito'],'epicondilitis-codo-tenista':['epicondilitis','codo de tenista'],
+  'fractura-muneca-radio-distal':['radio distal','fractura de muneca'],'fractura-cadera-adulto-mayor':['fractura de cadera'],
+  'protesis-cadera-que-esperar':['protesis de cadera','protesis cadera'],'protesis-rodilla-que-esperar':['protesis de rodilla','protesis rodilla'],
+  'rotura-ligamento-cruzado-anterior':['ligamento cruzado','lca'],'ruptura-tendon-aquiles':['aquiles'],
+  'sindrome-meniscal':['menisco','meniscal'],'sindrome-patelofemoral':['patelofemoral','condromalacia'],
+  'tendinitis-rotuliana-cuadricipital-rodilla-saltador':['rotuliana','rodilla del saltador'],'desgarros-contracturas-musculares':['desgarro','contractura']
+};
+function pskNorm_(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function pskSugerir_(){
+  const dx = pskNorm_((pacienteActivo&&pacienteActivo.Diagnostico_Principal)||'');
+  let mejor = '', largo = 0;
+  Object.keys(PSK_PALABRAS).forEach(slug=>{ PSK_PALABRAS[slug].forEach(w=>{ if(dx.indexOf(w)>-1 && w.length>largo && pskTemas.some(t=>t.slug===slug)){ mejor = slug; largo = w.length; } }); });
+  return mejor;
+}
+function pskTitulo_(slug){ const t = pskTemas.find(x=>x.slug===slug); return t ? t.titulo : String(slug).replace(/-/g,' '); }
+function pskFecha_(iso){ const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : ''; }
+function cargarPSK_(){
+  const cont = document.getElementById('cardPS');
+  if(!cont || !pacienteActivo) return;
+  cont.innerHTML = '<div class="card"><h2>🔑 Clave C — estrategia del equipo</h2><div class="muted">Cargando…</div></div>';
+  Promise.all([apiGet({action:'get_pagina_salud_temas'}), apiGet({action:'get_pagina_salud_accesos', dni:pacienteActivo.DNI})]).then(rs=>{
+    const t = rs[0], a = rs[1];
+    pskError = (t && t.success) ? '' : ((t&&t.error)||'Todavía no se aplicó la versión 19 del backend (Codigo.gs).');
+    pskTemas = (t && t.success) ? (t.temas||[]).filter(x=>x.claves.indexOf('C')>-1) : [];
+    pskAccesos = (a && a.success) ? (a.accesos||[]) : [];
+    renderPSK_();
+  }).catch(()=>{ pskError = 'Sin conexión o backend sin actualizar (Codigo.gs v19).'; renderPSK_(); });
+}
+function renderPSK_(){
+  const cont = document.getElementById('cardPS'); if(!cont) return;
+  let h = '<div class="card"><h2>🔑 Clave C — estrategia del equipo</h2>';
+  if(pskError){ cont.innerHTML = h + '<p class="muted">' + kepEsc_(pskError) + '</p></div>'; return; }
+  h += '<p class="muted">El médico emite la Clave A con el RMYT. <b>La Clave C la entregás vos, solo si el paciente es tratado por el equipo.</b> Si ya tiene un código, la C se suma a ese mismo código (no necesita QR nuevo). Si se trata con otro profesional, la página le muestra solo una idea general.</p>';
+  if(!pskTemas.length){ cont.innerHTML = h + '<p class="muted">Todavía no hay temas con Clave C publicada en la página (cada una se publica cuando el kinesiólogo responsable la firma).</p></div>'; return; }
+  if(pskAccesos.length){
+    h += '<div style="margin-bottom:8px">' + pskAccesos.map(a=>'<div class="evolucion-item"><b>' + kepEsc_(pskTitulo_(a.tema)) + '</b> · ' + (a.codigo ? 'claves ' + kepEsc_(a.claves.split('').join('+')) + ' · vence ' + kepEsc_(pskFecha_(a.vence)) : 'artículo general (sin código)') + '</div>').join('') + '</div>';
+  }
+  const sug = pskSugerir_();
+  h += '<label>Tema (diagnóstico: ' + kepEsc_((pacienteActivo&&pacienteActivo.Diagnostico_Principal)||'sin cargar') + ')</label><select id="pskTema">' +
+    pskTemas.slice().sort((a,b)=>a.titulo.localeCompare(b.titulo,'es')).map(t=>'<option value="'+kepEsc_(t.slug)+'"'+(t.slug===sug?' selected':'')+'>'+kepEsc_(t.titulo)+'</option>').join('') + '</select>' +
+    '<div class="row"><div><label>Días de acceso</label><input type="number" id="pskDias" value="30" min="1" max="365"></div></div>' +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="pskMail" style="width:auto"' + ((pacienteActivo&&pacienteActivo.Email)?' checked':'') + '> Avisar por mail al paciente' + ((pacienteActivo&&pacienteActivo.Email)?'':' (no tiene mail cargado)') + '</label>' +
+    '<div style="margin-top:8px"><button class="btn-primary" onclick="pskEntregarC_()">Entregar Clave C (lo trata el equipo)</button></div><div id="pskRes" class="muted" style="margin-top:8px"></div></div>';
+  cont.innerHTML = h;
+}
+function pskEntregarC_(){
+  if(!pacienteActivo){ toast('Seleccioná un paciente primero'); return; }
+  const sel = document.getElementById('pskTema'); if(!sel) return;
+  const out = document.getElementById('pskRes'); out.textContent = 'Generando…';
+  apiPost({ action:'ps_crear_acceso', dni:pacienteActivo.DNI, tema:sel.value, claves:'C', dias:document.getElementById('pskDias').value, enviarMail:document.getElementById('pskMail').checked,
+    profesional:(localStorage.getItem('ksm_prof_nombre')||'Equipo de kinesiología') }).then(res=>{
+    if(!res.success){ out.textContent = res.error || 'No se pudo entregar la clave'; return; }
+    let qr = ''; try{ if(typeof qrcode !== 'undefined' && res.enlace){ const q = qrcode(0,'M'); q.addData(res.enlace); q.make(); qr = q.createImgTag(4,2,'QR de acceso'); } }catch(_){}
+    out.innerHTML = '✅ ' + kepEsc_(res.message) + (res.mailEnviado ? ' Se avisó por mail al paciente.' : '') + '<br>' + (qr ? '<div style="margin:6px 0">' + qr + '</div>' : '') +
+      '<a href="' + kepEsc_(res.enlace) + '" target="_blank" rel="noopener">' + kepEsc_(res.enlace) + '</a>';
+    try{ navigator.clipboard.writeText(res.enlace).then(()=>toast('Enlace copiado')).catch(()=>{}); }catch(_){}
+    apiGet({action:'get_pagina_salud_accesos', dni:pacienteActivo.DNI}).then(a=>{ if(a&&a.success) pskAccesos = a.accesos||[]; });
+  }).catch(()=>{ out.textContent = 'Error de conexión'; });
+}
+
+
+// ═════════════════════════════════════════════════════════════════
+// KINESIOLOGÍA — portada con QR, historia clínica kinésica, evolución y alta
+// El paciente se inscribe, marca presente y salida desde KIN_Portada.html
+// (mismo QR). Acá el kinesiólogo ve su historia, la orden del médico, el
+// resumen de estudios (si el prescriptor es del equipo), las sesiones con
+// la sensación del paciente, y carga SU opinión: así queda la concordancia.
+// Al alta se envía la bitácora al paciente y se da de baja su código.
+// ═════════════════════════════════════════════════════════════════
+let kinData = null;
+const KIN_CENTROS_UI = {rehab:'Rehabilitarte Instituto Médico', sicoli:'Hospital Sicoli', espanol:'Hospital Español', palmares:'Centro Médico Palmares', sandona:'Clínica San Donà', altomaipu:'Centro Médico Alto Maipú', norte:'Consultorios del Norte', consultorio:'Consultorio Dr. Muratori'};
+function kinLinkPortada_(centro){ return new URL('KIN_Portada.html', location.href.replace(/[#?].*$/,'')).href.replace(/KIN_Portada\.html.*/, 'KIN_Portada.html') + '?centro=' + encodeURIComponent(centro); }
+function renderKinPortada_(){
+  const c = document.getElementById('cardKinPortada'); if(!c) return;
+  c.innerHTML = '<h2>📲 Portada Polidori Kinesiología (turno, presente, salida, mensaje y membresía)</h2>' +
+    '<p class="muted">Un solo QR por centro: la 1ª vez el paciente se inscribe (datos, lesión, foto de la orden); después lo escanea para marcar su presente y su salida con firma. Imprimilo o mostralo en pantalla.</p>' +
+    '<label>Centro</label><select id="kinCentro" onchange="kinPintarQR_()">' + Object.keys(KIN_CENTROS_UI).map(k=>'<option value="'+k+'">'+kepEsc_(KIN_CENTROS_UI[k])+'</option>').join('') + '</select>' +
+    '<div id="kinQR" style="margin:10px 0;text-align:center"></div><div id="kinLinkTxt" class="muted" style="word-break:break-all"></div>' +
+    '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-secundario" onclick="kinCopiarLink_()">Copiar link</button><button class="btn-secundario" onclick="window.print()">Imprimir QR</button></div>' +
+    '<label>Enviar el link por mail a un paciente (turno)</label><div class="row" style="grid-template-columns:1fr auto"><input type="text" id="kinMailPac" placeholder="mail del paciente"><button class="btn-primary" onclick="kinEnviarPortada_()">Enviar</button></div>';
+  kinPintarQR_(); cargarKinOrdenes_();
+}
+function kinPintarQR_(){
+  const centro = document.getElementById('kinCentro').value, link = kinLinkPortada_(centro);
+  let qr = ''; try{ if(typeof qrcode !== 'undefined'){ const q = qrcode(0,'M'); q.addData(link); q.make(); qr = q.createImgTag(6,2,'QR de la portada'); } }catch(_){}
+  document.getElementById('kinQR').innerHTML = qr; document.getElementById('kinLinkTxt').textContent = link;
+}
+function kinCopiarLink_(){ const t = document.getElementById('kinLinkTxt').textContent; try{ navigator.clipboard.writeText(t).then(()=>toast('Link copiado')).catch(()=>{}); }catch(_){} }
+function kinEnviarPortada_(){
+  const m = document.getElementById('kinMailPac').value.trim();
+  if(!/^\S+@\S+\.\S+$/.test(m)){ toast('Escribí un mail válido'); return; }
+  apiPost({action:'kin_enviar_portada', email:m, centro:document.getElementById('kinCentro').value}).then(r=>{ toast(r.success ? (r.message||'Enviado') : ('Error: '+(r.error||''))); }).catch(()=>toast('Error de conexión'));
+}
+
+function cargarKIN_(){
+  const cont = document.getElementById('cardKIN'); if(!cont || !pacienteActivo) return;
+  cont.innerHTML = '<div class="card"><h2>🗂 Historia clínica kinésica</h2><div class="muted">Cargando…</div></div>';
+  apiGet({action:'get_kin_hc', dni:pacienteActivo.DNI}).then(res=>{
+    if(!res || !res.success){ cont.innerHTML = '<div class="card"><h2>🗂 Historia clínica kinésica</h2><p class="muted">' + kepEsc_((res&&res.error)||'Todavía no se aplicó la versión 20 del backend (Codigo.gs).') + '</p></div>'; return; }
+    kinData = res; renderKIN_(res);
+  }).catch(()=>{ cont.innerHTML = '<div class="card"><h2>🗂 Historia clínica kinésica</h2><p class="muted">Sin conexión o backend sin actualizar (Codigo.gs v20).</p></div>'; });
+}
+function kinSens_(v){ return v==null ? '—' : v; }
+function renderKIN_(k){
+  const cont = document.getElementById('cardKIN'); const hc = k.hc;
+  let h = '<div class="card"><h2>🗂 Historia clínica kinésica</h2>';
+  if(!hc){ cont.innerHTML = h + (k.orden ? kinOrdenHTML_(k) + '<p class="muted">El paciente todavía no se inscribió por el QR: cuando se contacte y se inscriba, la orden se vincula sola a su historia.</p>' : '<p class="muted">Este paciente todavía no se inscribió por el QR de kinesiología. Compartile el link desde la tarjeta "Portada".</p>') + kinNotasHTML_(k) + '</div>'; return; }
+  const alta = hc.estado==='alta';
+  h += '<div class="evolucion-item"><div class="meta">' + kepEsc_(hc.apellido) + ', ' + kepEsc_(hc.nombre) + ' — DNI ' + kepEsc_(hc.dni) + ' — nac. ' + kepEsc_(hc.fnac) + (hc.sexo?' — '+kepEsc_(hc.sexo):'') + '</div>' +
+    '📞 ' + kepEsc_(hc.telefono) + (hc.email?' · ✉ '+kepEsc_(hc.email):'') + '<br>💳 ' + kepEsc_(hc.os||'sin obra social') + (hc.afiliado?' · afil. '+kepEsc_(hc.afiliado):'') + '<br>' +
+    '<b>Lesión:</b> ' + kepEsc_(hc.region) + (hc.lado?' ('+kepEsc_(hc.lado)+')':'') + (hc.operado?' · operado/a':'') + (hc.fecha_lesion?' · desde '+kepEsc_(hc.fecha_lesion):'') + '<br>' + kepEsc_(hc.diagnostico) + '<br>' +
+    '<b>Médico prescriptor:</b> ' + kepEsc_(hc.medico||'—') + (hc.medico_tipo==='equipo'?' <span class="badge badge-ok">equipo del consultorio</span>':'') + '<br>' +
+    '<b>Kinesiólogo/a actuante:</b> ' + kepEsc_(hc.kinesiologo||'—') + ' · ' + kepEsc_(hc.centro_nombre||'') + '<br>' +
+    '<b>Sesiones:</b> ' + k.sesiones.filter(s=>s.estado==='cerrada').length + (hc.prescriptas?' de '+hc.prescriptas:'') + ' · turno preferido: ' + kepEsc_(hc.turno_pref||'—') +
+    (hc.orden_url ? '<br>📎 <a href="'+kepEsc_(hc.orden_url)+'" target="_blank" rel="noopener">Ver la orden médica (foto)</a>' : '<br><span class="muted">Sin foto de la orden</span>') +
+    (hc.firma_consent ? ' · <a href="'+kepEsc_(hc.firma_consent)+'" target="_blank" rel="noopener">Consentimiento firmado</a>' : '') +
+    (alta ? '<br><span class="badge badge-pend">ALTA ' + kepEsc_(hc.tipo_alta) + ' — ' + kepEsc_(hc.fecha_alta) + '</span>' : '') + '</div>';
+  h += kinOrdenHTML_(k);
+  if(k.estudios) h += '<details open style="margin:8px 0"><summary style="cursor:pointer;font-weight:700;font-size:13px">🩺 Resumen de estudios del consultorio médico</summary><div class="evolucion-item" style="white-space:pre-line">' + kepEsc_(k.estudios) + '</div></details>';
+  else if(hc.medico_tipo==='equipo') h += '<p class="muted">El médico del equipo todavía no tiene estudios cargados para este paciente en su historia clínica.</p>';
+  h += kinMembHTML_(hc);
+  const c = k.concordancia;
+  h += '<h2 style="font-size:14px;margin-top:12px">📊 Sesiones y concordancia</h2>';
+  if(c && c.n){
+    h += '<div style="margin-bottom:6px"><span class="badge ' + (c.pct>=70?'badge-ok':'badge-pend') + '">Concordancia paciente/terapeuta: ' + c.pct + '%</span> <span class="muted">' + c.concuerdan + ' coinciden · ' + c.parcial + ' parcial · ' + c.discrepan + ' difieren (criterio práctico: ≤1 punto coincide)</span></div>';
+  } else h += '<p class="muted">La concordancia aparece cuando el paciente registra su salida y vos cargás tu opinión de esa sesión.</p>';
+  if(k.sesiones.length){
+    h += '<canvas id="kinGrafica" height="120" style="margin:6px 0"></canvas><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="text-align:left;color:var(--muted)"><th>N°</th><th>Fecha</th><th>Llega</th><th>Sale</th><th>Vos</th><th>Conf.</th><th>Firma</th></tr>' +
+      k.sesiones.map(s=>'<tr style="border-top:1px solid var(--border)"><td>'+s.n+'</td><td>'+kepEsc_(s.fecha)+'</td><td>'+kinSens_(s.sens_entrada)+'</td><td>'+kinSens_(s.sens_salida)+'</td><td>'+kinSens_(s.sens_kine)+'</td><td>'+(s.conforme==='conforme'?'👍':s.conforme==='con_reparos'?'🤔':(s.estado==='abierta'?'⏳':'—'))+'</td><td>'+(s.firma_entrada?'<a href="'+kepEsc_(s.firma_entrada)+'" target="_blank" rel="noopener">✍E</a> ':'')+(s.firma_salida?'<a href="'+kepEsc_(s.firma_salida)+'" target="_blank" rel="noopener">✍S</a>':'')+'</td></tr>' + (s.comentario?'<tr><td></td><td colspan="6" class="muted">💬 '+kepEsc_(s.comentario)+'</td></tr>':'') + (s.hecho?'<tr><td></td><td colspan="6" class="muted">🧰 '+kepEsc_(s.hecho)+(s.puntos?' · 📐 '+kepEsc_(s.puntos):'')+'</td></tr>':'')).join('') + '</table></div>';
+    if(!alta){
+      h += '<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:700;font-size:13px">✏️ Cargar mi evolución de una sesión</summary>' +
+        '<label>Sesión</label><select id="kinSesSel">' + k.sesiones.map(s=>'<option value="'+s.fila+'">Sesión '+s.n+' — '+kepEsc_(s.fecha)+'</option>').join('') + '</select>' +
+        '<label>Qué se hizo</label><textarea id="kinHecho" placeholder="Técnicas, ejercicios, dosificación…"></textarea>' +
+        '<label>Puntos de evaluación tenidos en cuenta</label><input type="text" id="kinPuntos" placeholder="Ej: ROM flexión 95°, edema, marcha, dolor a la palpación">' +
+        '<div class="row"><div><label>Tu opinión del estado hoy (0 muy mal – 10 muy bien)</label><input type="number" id="kinSensK" min="0" max="10" step="1"></div><div><label>Evolución</label><select id="kinEvoK"><option value="">—</option><option value="mejor">Mejor</option><option value="igual">Igual</option><option value="peor">Peor</option></select></div></div>' +
+        '<div style="margin-top:8px"><button class="btn-primary" onclick="kinGuardarNota_()">Guardar evolución</button></div></details>';
+    }
+  } else h += '<p class="muted">Todavía no hay sesiones: el paciente marca su presente escaneando el QR.</p>';
+  if(!alta){
+    h += '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0"><h2 style="font-size:14px">🏁 Alta kinésica</h2>' +
+      '<p class="muted">Cierra el tratamiento, envía al paciente la bitácora (asistencia, sensaciones, lo que se hizo, puntos de evaluación y concordancia), avisa al médico y da de baja su código de la página de salud.</p>' +
+      '<label>Conclusión (opcional)</label><textarea id="kinConclusion" placeholder="Ej: recuperó rango completo, vuelve a su actividad; sigue con ejercicios de mantenimiento"></textarea>' +
+      '<div style="margin-top:8px"><button class="btn-primary" onclick="kinDarAlta_()">Dar el alta y enviar la bitácora</button></div>';
+  }
+  cont.innerHTML = h + kinNotasHTML_(k) + '</div>';
+  kinGrafica_(k.sesiones);
+}
+function kinOrdenHTML_(k){
+  const o = k.orden; if(!o && !k.orden_medica) return '';
+  const ind = (o && o.indicacion) || k.orden_medica || '';
+  return '<div class="evolucion-item" style="border-left:4px solid #0369a1"><div class="meta">📥 Orden del médico' + (o ? ' — ' + kepEsc_(o.medico||'') + ' · ' + kepEsc_(o.fecha||'') + ' · <b>' + (o.estado==='vinculada' ? 'vinculada a la historia' : 'enviada, esperando que el paciente se inscriba') + '</b>' : '') + '</div>' +
+    '<div style="white-space:pre-line">' + kepEsc_(ind) + '</div>' + (o && (o.sesiones||o.frecuencia) ? '<div class="muted">Sesiones: ' + (o.sesiones||'—') + (o.frecuencia ? ' × ' + kepEsc_(o.frecuencia) : '') + (o.diagnostico ? ' · Dx: ' + kepEsc_(o.diagnostico) : '') + '</div>' : '') +
+    (o && o.estado!=='vinculada' && (o.telefono||o.email) ? '<div class="muted">Contacto del paciente: ' + kepEsc_(o.telefono||'') + (o.email ? ' · ' + kepEsc_(o.email) : '') + '</div>' : '') + '</div>';
+}
+function kinNotasHTML_(k){
+  const n = k.notas || [];
+  return '<hr style="border:none;border-top:1px solid var(--border);margin:14px 0"><h2 style="font-size:14px">🤝 Historia compartida (médico ↔ kinesiólogo)</h2><p class="muted">Un solo hilo: lo que escribe el Dr. Muratori y lo que escribís vos lo ven los dos.</p>' +
+    (n.length ? n.map(x=>'<div class="evolucion-item"><div class="meta"><span class="badge ' + (x.tipo==='medico'?'badge-ok':'badge-pend') + '">' + (x.tipo==='medico'?'Médico':'Kinesiólogo') + '</span> ' + kepEsc_(x.autor) + ' · ' + kepEsc_(String(x.fecha).slice(0,16).replace('T',' ')) + '</div><div style="white-space:pre-line">' + kepEsc_(x.texto) + '</div></div>').join('') : '<p class="muted">Todavía no hay notas.</p>') +
+    '<textarea id="kinNotaTxt" maxlength="1000" placeholder="Evaluación inicial, hallazgos, dudas para el médico…"></textarea><div style="margin-top:6px"><button class="btn-primary" onclick="kinGuardarNotaComp_()">Agregar a la historia compartida</button></div>';
+}
+function kinGuardarNotaComp_(){
+  const t = document.getElementById('kinNotaTxt').value.trim(); if(t.length<3){ toast('Escribí la nota'); return; }
+  apiPost({action:'kin_nota_compartida', dni:pacienteActivo.DNI, autor_tipo:'kine', autor:(localStorage.getItem('ksm_prof_nombre')||'Kinesiología'), texto:t}).then(r=>{
+    if(r.success){ toast('Nota agregada'); cargarKIN_(); } else toast('Error: ' + (r.error||'desconocido'));
+  }).catch(()=>toast('Error de conexión'));
+}
+let kinOrdenes = [];
+function cargarKinOrdenes_(){
+  const c = document.getElementById('cardKinOrdenes'); if(!c) return;
+  apiGet({action:'get_kin_ordenes'}).then(r=>{
+    kinOrdenes = (r && r.success) ? (r.ordenes||[]) : [];
+    if(!kinOrdenes.length){ c.classList.add('oculto'); c.innerHTML=''; return; }
+    c.classList.remove('oculto');
+    c.innerHTML = '<h2>📥 Órdenes del Dr. Muratori — pacientes para contactar (' + kinOrdenes.length + ')</h2><p class="muted">Aceptaron hacer la rehabilitación acá. Contactalos para el turno; cuando se inscriban por el QR, la orden se vincula sola.</p>' +
+      kinOrdenes.map((o,i)=>'<div class="evolucion-item"><div class="meta"><b>' + kepEsc_(o.paciente) + '</b> · ' + kepEsc_(o.fecha) + (o.telefono?' · 📞 '+kepEsc_(o.telefono):'') + (o.email?' · ✉ '+kepEsc_(o.email):'') + '</div>' + kepEsc_(o.indicacion) + (o.sesiones?'<div class="muted">'+o.sesiones+' sesiones'+(o.frecuencia?' × '+kepEsc_(o.frecuencia):'')+'</div>':'') + '<div style="margin-top:6px"><button class="btn-secundario" onclick="kinAbrirOrden_('+i+')">Abrir su historia</button></div></div>').join('');
+  }).catch(()=>{});
+}
+function kinAbrirOrden_(i){
+  const o = kinOrdenes[i]; if(!o) return;
+  const m = String(o.paciente||'').split(','), ape = (m[0]||'').trim(), nom = (m.slice(1).join(',')||'').trim();
+  seleccionarPaciente({DNI:o.dni||'', Apellido:ape, Nombre:nom, Email:o.email||'', Diagnostico_Principal:o.diagnostico||''});
+}
+function kinMembHTML_(hc){
+  const m = hc.membresia || '', et = {activa:'✅ activa', vencida:'⚠️ vencida', solicitada:'⏳ solicitada (falta confirmar el pago)', inactiva:'inactiva'}[m] || 'sin solicitar';
+  return '<div class="evolucion-item" style="border-left:4px solid #be185d"><div class="meta">⭐ Membresía de seguimiento: <b>' + et + '</b>' + (m==='activa'||m==='vencida' ? ' · hasta ' + kepEsc_(hc.membresia_vence||'—') : '') + '</div>' +
+    '<div class="muted">El pago se cobra por fuera del sistema (link/alias que cargaste en el backend). Cuando lo confirmes, activala.</div>' +
+    '<div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primary" onclick="kinMembEstado_(\'activa\')">Confirmar pago: activar 30 días</button>' +
+    (m ? '<button class="btn-secundario" onclick="kinMembEstado_(\'inactiva\')">Dar de baja</button>' : '') + '</div></div>';
+}
+function kinMembEstado_(estado){
+  if(estado==='inactiva' && !confirm('¿Dar de baja la membresía de este paciente?')) return;
+  apiPost({action:'kin_membresia_estado', dni:pacienteActivo.DNI, estado:estado, dias:30}).then(r=>{
+    if(r.success){ toast(r.message||'Listo'); cargarKIN_(); } else toast('Error: ' + (r.error||'desconocido'));
+  }).catch(()=>toast('Error de conexión'));
+}
+function kinGrafica_(ses){
+  try{
+    const c = document.getElementById('kinGrafica'), cer = ses.filter(s=>s.estado==='cerrada').slice().reverse();
+    if(!c || typeof Chart==='undefined' || cer.length<2){ if(c) c.style.display='none'; return; }
+    new Chart(c, { type:'line', data:{ labels:cer.map(s=>'S'+s.n), datasets:[
+      { label:'Sensación del paciente al salir', data:cer.map(s=>s.sens_salida), borderColor:'#0369a1', backgroundColor:'#0369a1', tension:.25, spanGaps:true },
+      { label:'Opinión del terapeuta', data:cer.map(s=>s.sens_kine), borderColor:'#16a34a', backgroundColor:'#16a34a', tension:.25, spanGaps:true } ] },
+      options:{ responsive:true, scales:{ y:{ min:0, max:10 } }, plugins:{ legend:{ position:'bottom' } } } });
+  }catch(_){}
+}
+function kinGuardarNota_(){
+  const fila = document.getElementById('kinSesSel').value;
+  apiPost({action:'kin_nota_sesion', dni:pacienteActivo.DNI, fila:fila, hecho:document.getElementById('kinHecho').value, puntos:document.getElementById('kinPuntos').value, sensacion_kine:document.getElementById('kinSensK').value, evolucion:document.getElementById('kinEvoK').value}).then(r=>{
+    if(r.success){ toast('Evolución guardada'); cargarKIN_(); } else toast('Error: ' + (r.error||'desconocido'));
+  }).catch(()=>toast('Error de conexión'));
+}
+function kinDarAlta_(){
+  if(!confirm('¿Dar el alta kinésica? Se enviará la bitácora al paciente y se dará de baja su código de la página de salud.')) return;
+  apiPost({action:'alta_paciente', tipo:'kinesica', dni:pacienteActivo.DNI, conclusion:document.getElementById('kinConclusion').value, profesional:(localStorage.getItem('ksm_prof_nombre')||'Kinesiología')}).then(r=>{
+    if(r.success){ toast(r.message||'Alta registrada'); cargarKIN_(); cargarPSK_(); } else toast('Error: ' + (r.error||'desconocido'));
+  }).catch(()=>toast('Error de conexión'));
+}
+
+
+// ── Facturación del mes (peaje del sistema) ──
+function cargarResumenFacturacion(){
+  const email = localStorage.getItem('ksm_prof_email')||'';
+  if(!email) return;
+  apiGet({action:'get_resumen_facturacion_sistema', profesionalEmail: email}).then(res=>{
+    const cont = document.getElementById('resumenFacturacion');
+    if(!res.success){ cont.textContent = 'Todavía no se aplicó el patch de facturación en el backend.'; return; }
+    cont.innerHTML =
+      'Sesiones facturadas este mes: ' + res.filas.length + '<br>' +
+      'Total facturado: $' + res.totalFacturado.toLocaleString('es-AR') + '<br>' +
+      'Peaje del sistema (' + peajePctVigente + '%): $' + res.totalComision.toLocaleString('es-AR') + '<br>' +
+      'Neto para vos: $' + res.totalNeto.toLocaleString('es-AR');
+  }).catch(()=>{
+    document.getElementById('resumenFacturacion').textContent = 'Todavía no se aplicó el patch de facturación en el backend.';
+  });
+}
+
+function enviarResumenFacturacion(){
+  const email = localStorage.getItem('ksm_prof_email')||'';
+  const nombre = localStorage.getItem('ksm_prof_nombre')||'';
+  if(!email){ toast('Falta tu mail'); return; }
+  apiPost({action:'enviar_resumen_facturacion_sistema', profesionalEmail: email, profesionalNombre: nombre}).then(res=>{
+    if(res.success) toast('Resumen enviado al consultorio');
+    else toast('Error: ' + (res.error||'desconocido'));
+  }).catch(()=> toast('Error de conexión'));
+}
+
+// ── Videollamada de seguimiento (reutiliza generarLinkMeet, ya existente
+//    en el backend — la misma función que usa el médico) ──
+function proximaMediaHora_(){
+  const d = new Date(Date.now() + 30*60000);
+  d.setSeconds(0,0);
+  return d.toISOString().slice(0,16);
+}
+function generarVideollamada(){
+  if(!pacienteActivo){ toast('Seleccioná un paciente primero'); return; }
+  const nombreProf = localStorage.getItem('ksm_prof_nombre')||'';
+  apiPost({
+    action:'generarLinkMeet',
+    fechaHoraISO: document.getElementById('meetFechaHora').value,
+    duracionMin: Number(document.getElementById('meetDuracion').value)||15,
+    titulo: 'Seguimiento kinésico — ' + (pacienteActivo.Apellido||'') + ', ' + (pacienteActivo.Nombre||''),
+    descripcion: 'A cargo de ' + nombreProf,
+    mailPaciente: document.getElementById('meetMailPaciente').value.trim()
+  }).then(res=>{
+    if(res.success){
+      document.getElementById('meetResultado').innerHTML = '✅ Evento creado. Link: <a href="' + res.link + '" target="_blank">' + res.link + '</a>' +
+        (document.getElementById('meetMailPaciente').value.trim() ? '<br>Se le mandó la invitación por mail al paciente.' : '<br>No se mandó invitación (no había mail cargado).');
+    } else {
+      toast('Error al generar la videollamada: ' + (res.error||'desconocido'));
+    }
+  }).catch(()=> toast('Error de conexión'));
+}
+
+// ── Informe de adherencia y progreso (kinesiólogo → médico) ──
+function armarResumenInforme_(){
+  if(!ultimoHistorial) return null;
+  const evoluciones = (ultimoHistorial.kinesiologia||[]).map(e=>{
+    let v={}; try{ v = JSON.parse(e.Valores_JSON || e.Vals_JSON || '{}'); }catch(_){}
+    return Object.assign({Timestamp:e.Timestamp, Region:e.Region}, v);
+  }).sort((a,b)=> new Date(a.Timestamp) - new Date(b.Timestamp));
+
+  const evaluaciones = (ultimoHistorial.evaluaciones||[])
+    .filter(e=> e.Profesional==='kinesiologo')
+    .map(e=>{
+      let v={}; try{ v = JSON.parse(e.Valores_JSON||'{}'); }catch(_){}
+      return Object.assign({Timestamp:e.Timestamp}, v);
+    }).sort((a,b)=> new Date(a.Timestamp) - new Date(b.Timestamp));
+
+  const totalSesiones = evoluciones.length;
+  const primeraDolor = evoluciones.length ? evoluciones[0].dolorPre : null;
+  const ultimaDolor = evoluciones.length ? evoluciones[evoluciones.length-1].dolorPost : null;
+
+  const totalAutoevals = evaluaciones.length;
+  const cumplioCompleto = evaluaciones.filter(e=> e.cumplimiento==='Completo').length;
+  const adherenciaPct = totalAutoevals ? Math.round((cumplioCompleto/totalAutoevals)*100) : null;
+
+  let tendencia = 'sin datos suficientes';
+  if(primeraDolor!==null && ultimaDolor!==null){
+    if(ultimaDolor < primeraDolor) tendencia = 'mejoría (dolor bajó de ' + primeraDolor + ' a ' + ultimaDolor + ')';
+    else if(ultimaDolor > primeraDolor) tendencia = 'empeoramiento (dolor subió de ' + primeraDolor + ' a ' + ultimaDolor + ')';
+    else tendencia = 'sin cambios (dolor se mantiene en ' + ultimaDolor + ')';
+  }
+
+  const nombreProf = localStorage.getItem('ksm_prof_nombre')||'';
+  const matriculaProf = localStorage.getItem('ksm_prof_matricula')||'';
+  const emailProf = localStorage.getItem('ksm_prof_email')||'';
+
+  const texto =
+    'Informe de seguimiento kinésico\n' +
+    'Paciente: ' + ((pacienteActivo.Apellido||'')+', '+(pacienteActivo.Nombre||'')) + ' — DNI ' + pacienteActivo.DNI + '\n' +
+    'Kinesiólogo/a: ' + nombreProf + ' (' + matriculaProf + ') — ' + emailProf + '\n' +
+    'Módulos opcionales activos: ' + modulosActivos_() + '\n\n' +
+    'Sesiones registradas: ' + totalSesiones + '\n' +
+    'Tendencia del dolor: ' + tendencia + '\n' +
+    'Autoevaluaciones del paciente recibidas: ' + totalAutoevals +
+    (adherenciaPct!==null ? ('\nAdherencia al plan de ejercicios (autoinformada): ' + adherenciaPct + '%') : '') +
+    '\n\nÚltimas observaciones de sesión: ' + (evoluciones.length ? evoluciones[evoluciones.length-1].observaciones||'(sin observaciones)' : '(sin evoluciones cargadas)');
+
+  return {texto, nombreProf, emailProf};
+}
+
+function previsualizarInforme(){
+  const r = armarResumenInforme_();
+  if(!r){ toast('Todavía no hay datos cargados de este paciente'); return; }
+  document.getElementById('previewInforme').innerHTML = '<pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:10px">' + r.texto + '</pre>';
+}
+
+function enviarInforme(){
+  const r = armarResumenInforme_();
+  if(!r){ toast('Todavía no hay datos cargados de este paciente'); return; }
+  if(!r.emailProf){ toast('Falta tu mail — completalo arriba en "Kinesiólogo a cargo"'); return; }
+  apiPost({
+    action:'kine_informe_enviar',
+    dni: pacienteActivo.DNI,
+    paciente: (pacienteActivo.Apellido||'') + ', ' + (pacienteActivo.Nombre||''),
+    kinesiologoNombre: r.nombreProf,
+    kinesiologoEmail: r.emailProf,
+    resumen: r.texto
+  }).then(res=>{
+    if(res.success) toast('Informe enviado al médico — puede responderte directo a tu mail');
+    else toast('Error al enviar: ' + (res.error||'desconocido'));
+  }).catch(()=> toast('Error de conexión'));
+}
+
+// Inicio
+if(!SHEETS_URL){
+  document.getElementById('cardConfig').classList.remove('oculto');
+} else {
+  mostrarCardProfesional();
+}
+</script>
+
+<!-- ══ TRIAL: bloqueo si venció el período de prueba (ver configurarTrial() en Codigo.gs) ══ -->
+<div id="trial-lock-overlay" style="display:none;position:fixed;inset:0;background:#0b1f3a;color:#fff;z-index:999999;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:system-ui,-apple-system,sans-serif">
+  <div style="max-width:420px">
+    <div style="font-size:40px;margin-bottom:12px">🔒</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px">Período de prueba finalizado</div>
+    <div style="font-size:13px;opacity:.85">Para seguir usando el sistema, contactá al Dr. Luis Alberto Muratori.</div>
+  </div>
+</div>
+<style>body.trial-vencido>*:not(#trial-lock-overlay){display:none!important} body.trial-vencido{overflow:hidden!important}</style>
+<script>
+(function(){
+  try{
+    fetch(SHEETS_URL+'?action=check_trial',{signal:AbortSignal.timeout(6000)})
+      .then(function(r){return r.json();}).then(function(d){
+        if(d && d.vencido){
+          document.body.classList.add('trial-vencido');
+          var ov=document.getElementById('trial-lock-overlay'); if(ov) ov.style.display='flex';
+        }
+      }).catch(function(){});
+  }catch(e){}
+})();
+</script>
+<script src="efecto-lupa.js" defer></script>
+</body>
+</html>

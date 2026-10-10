@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<meta name="robots" content="noindex">
+<title>Kinesiología — turno, presente y salida — SIM-M</title>
+<style>
+  :root{ --azul:#0369a1; --azul-osc:#075985; --verde:#16a34a; --ambar:#b45309; --rojo:#dc2626; --muted:#64748b; --border:#e2e8f0; --bg:#f1f5f9; }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;margin:0;color:#0f172a;line-height:1.5;padding-bottom:60px;min-height:100vh;background-color:#0c1014;background-image:linear-gradient(180deg,#0c1014 0,#0c1014 250px,rgba(12,16,20,0) 520px),radial-gradient(circle at 12% 88%,rgba(214,32,148,.38),transparent 46%),radial-gradient(circle at 92% 72%,rgba(255,138,0,.30),transparent 44%),radial-gradient(circle at 50% 38%,rgba(60,70,110,.35),transparent 60%);background-attachment:fixed;background-repeat:no-repeat}
+  .hero{background:#0c1014;color:#fff;padding:22px 16px 18px;text-align:center}
+  .hero .logo{width:168px;max-width:56%;height:auto;display:block;margin:0 auto 6px}
+  .hero h1{font-size:21px;margin:2px 0 2px;font-weight:800;letter-spacing:.3px}
+  .hero p{font-size:13px;margin:0;opacity:.93}
+  .hero .centro{display:inline-block;margin-top:10px;background:rgba(255,255,255,.16);border-radius:999px;padding:4px 14px;font-size:12px;font-weight:700}
+  .wrap{max-width:560px;margin:0 auto;padding:14px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 8px 28px rgba(0,0,0,.28)}
+  .pie{text-align:center;margin-top:18px;font-size:12.5px;color:#cbd5e1}
+  .mem{background:linear-gradient(135deg,#fdf2f8,#fff7ed);border:1px solid #f9a8d4}
+  .precio{font-size:22px;font-weight:800;color:#9d174d;margin:6px 0}
+  .big.m{border-color:#d946a8;background:linear-gradient(135deg,#fff,#fdf2f8);color:#9d174d}
+  .card h2{font-size:16px;margin:0 0 4px;color:var(--azul-osc)}
+  .sub{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+  .big{display:block;width:100%;text-align:left;padding:16px;border:2px solid var(--border);border-radius:14px;background:#fff;font-size:16px;font-weight:800;color:var(--azul-osc);cursor:pointer;margin-bottom:12px}
+  .big small{display:block;font-weight:500;font-size:12.5px;color:var(--muted);margin-top:2px}
+  .big.p{background:var(--azul);color:#fff;border-color:var(--azul)} .big.p small{color:#e0f2fe}
+  label.l{display:block;font-size:13px;font-weight:600;color:#334155;margin:12px 0 5px}
+  input[type=text],input[type=tel],input[type=email],input[type=date],input[type=number],select,textarea{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:9px;font-size:15px;font-family:inherit;background:#fff}
+  textarea{min-height:76px;resize:vertical}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{width:100%;margin-top:14px;padding:14px;border:none;border-radius:11px;background:var(--azul);color:#fff;font-size:16px;font-weight:800;cursor:pointer}
+  .btn.v{background:var(--verde)} .btn.s{background:#fff;color:var(--azul-osc);border:2px solid var(--border)}
+  .btn:disabled{opacity:.55}
+  .oculto{display:none}
+  .err{color:var(--rojo);font-size:13.5px;margin-top:10px;font-weight:600}
+  .aviso{background:#fffbeb;border:1px solid #fcd34d;color:#78350f;border-radius:10px;padding:10px 12px;font-size:12.5px;margin:10px 0}
+  .pasos{display:flex;gap:6px;margin-bottom:12px}
+  .pasos span{flex:1;height:6px;border-radius:4px;background:#cbd5e1} .pasos span.on{background:var(--azul)}
+  .esc{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
+  .esc button{padding:10px 0;border:2px solid var(--border);border-radius:10px;background:#fff;font-size:16px;font-weight:800;color:#334155;cursor:pointer}
+  .esc button.on{color:#fff;border-color:transparent}
+  .extremos{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:4px}
+  .pad{border:2px dashed #94a3b8;border-radius:12px;background:#fff;touch-action:none;width:100%;height:170px;display:block}
+  .padbar{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12.5px;color:var(--muted)}
+  .padbar button{border:none;background:none;color:var(--azul);font-weight:700;font-size:13px;cursor:pointer}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:11px;border:2px solid var(--border);border-radius:11px;margin-top:8px;font-size:14px;cursor:pointer}
+  .opt input{margin-top:3px;width:18px;height:18px;flex-shrink:0}
+  .opt.on{border-color:var(--azul);background:#f0f9ff}
+  .foto{display:flex;gap:12px;align-items:center;margin-top:6px}
+  .foto img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--border)}
+  .ok{text-align:center;padding:26px 12px}
+  .ok .gr{font-size:48px}
+  .muted{color:var(--muted);font-size:12.5px}
+  a.back{display:inline-block;font-size:13px;color:#fff;font-weight:700;margin-bottom:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="hero">
+  <img class="logo" alt="Polidori Kinesiología — Bienestar en movimiento" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQgAAADVCAMAAACc/56IAAABgFBMVEX///////3///v///n+///8///+//38//39//r7///6///5///7//z4///3///4//31///z///u/////v///f///v3//f7//vv//vn//P//+////Pz/+v//+f//+fv/9///9P/+/v79/v/+/f/7/f/8/P79/f38/fz9/fr9+/76+/37+vr8+/j9+P36+Pz89fz5/f72/f73+v34+Pz3+Pb39fnz+v7z9Pbu+P3l9//+8P318fbw7/Hp7vPw6e/m5+ft3Ozc7frY5vPZ3+jL3u7Z197Z0dvE1OLezNrTzNXVxtTXvdPcunT/xwD/uQDAytXAwMqxxdSrvcvCs8G3tLyitMLcpDv/oQC1qL6zoHz/gwHLhS+lhaKffGmSp7WJna6GlJ+LfpWFg3lqgpNhdYX/XRmyYQ9jbHVrXCz7PTT7H06eLyVfNRRKZHlEW29DUF4yTWI1P0U1MSUnHRUpEB4MEBToAZnfAKz9BGvwAn/TAMXXALi6A46GB25WC0cpDimBvUJ7AAAqXklEQVR42u2diVfa2PvwE0zAGKGEG8AEEBCUVWVfFBc2ETwtgnLqaT2AA1NnpgWX1lneWvuvv89NwKpVdFxo5/f1Mtqw6Hg/efa7ESfPTWrEM4JnEM8gnkE8g3gG8QziGcQziGcQzyCeQTyDeAbxDOIZxDOI/00QX7+eff36vwvi69mXL19OT0//6je4hlfOvv7vgMAITv+U2l8X2ud+O/1ROIYJ4msfwfcgvpH4/P+gnX75+n8WxNezixROv5zh9vXrJ8lOfMVPQFTOSQyfBTEsCv/88885g6+DNOe0R2LILIYA4tMXTEFqd9N/oPF56CyIpzcM3yj8ix8DyZBRfB4SCmI4GE6vUDg+2N9rbG8W8/kVaPl8cXO7sbd/cHwti39F8KcEcdbDcOmmHu03t/Mry6l4POJzzdgJaPYZly8Sj6eWV/Lbzf2jixw/DwvFE4I4O/37778Bw9mnCxB28iupuG+G6DWy33rPZ3zx1Ep+5xuMTz2xOD37r4I4++dv3C504GhvcyUVcfW6TMHjHAciLjZXJLWyuXf0DegwUDwViC9XMBztFZdTvm+dpWh4nDfiu+ZLLRfPWfRQfPnvgTiTMHzT7P3tlYsUMIhLjbiu+VIr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">
+  <h1>Polidori Kinesiología</h1>
+  <p>Kinesiólogo: Fernando Polidori · Turno, presente y salida desde tu celular</p>
+  <span class="centro" id="centroTag">Consultorio Dr. Luis Alberto Muratori</span>
+</div>
+
+<div class="wrap">
+
+  <!-- PORTADA -->
+  <div id="v-home">
+    <button class="big p" onclick="ir('insc')">🆕 Primera vez: sacar turno e inscribirme<small>Cargás tus datos, tu lesión y la foto de la orden médica (3 minutos)</small></button>
+    <button class="big" onclick="ident('asist')">✅ Ya soy paciente: presente / salida<small>El mismo QR sirve para marcar que llegaste y, al terminar, tu salida con tu firma</small></button>
+    <button class="big" onclick="ident('msg')">✉️ Escribirle a mi kinesiólogo<small>Tu mensaje le llega por mail a Fernando y te responde directo</small></button>
+    <button class="big m" onclick="ident('mem')">⭐ Membresía de seguimiento<small>Seguimiento mensual continuo de tu evolución, con comunicación directa</small></button>
+    <div class="card"><h2>¿Cómo funciona?</h2>
+      <p class="sub" style="margin:0">La primera vez te inscribís. Después, en cada sesión escaneás este mismo QR: al llegar marcás tu <b>presente</b> (firmás con el dedo) y al terminar tu <b>salida</b> (contás cómo te sentís, dejás un comentario y firmás tu conformidad). Tu kinesiólogo y tu médico ven tu evolución y, cuando termines, recibís una bitácora con todo lo que se hizo.</p>
+    </div>
+  </div>
+
+  <!-- INSCRIPCIÓN -->
+  <div id="v-insc" class="oculto">
+    <a class="back" onclick="ir('home')">← Volver</a>
+    <div class="pasos"><span id="p1" class="on"></span><span id="p2"></span><span id="p3"></span></div>
+
+    <div id="s1" class="card">
+      <h2>1 de 3 · Tus datos</h2><p class="sub">Para armar tu historia clínica de kinesiología.</p>
+      <div class="dos"><div><label class="l">Apellido</label><input type="text" id="i_ape" autocomplete="family-name"></div><div><label class="l">Nombre</label><input type="text" id="i_nom" autocomplete="given-name"></div></div>
+      <div class="dos"><div><label class="l">DNI</label><input type="tel" id="i_dni" inputmode="numeric" maxlength="9"></div><div><label class="l">Fecha de nacimiento</label><input type="date" id="i_fnac"></div></div>
+      <div class="dos"><div><label class="l">Teléfono</label><input type="tel" id="i_tel" autocomplete="tel"></div><div><label class="l">Sexo</label><select id="i_sexo"><option value="">—</option><option>Femenino</option><option>Masculino</option><option>Otro</option></select></div></div>
+      <label class="l">Mail (opcional, para recibir confirmación y tu bitácora)</label><input type="email" id="i_mail" autocomplete="email">
+      <div class="dos"><div><label class="l">Obra social</label><input type="text" id="i_os"></div><div><label class="l">N° de afiliado</label><input type="text" id="i_afi"></div></div>
+      <button class="btn" onclick="paso(2)">Siguiente</button><div class="err" id="e1"></div>
+    </div>
+
+    <div id="s2" class="card oculto">
+      <h2>2 de 3 · Tu lesión y la orden médica</h2>
+      <label class="l">Zona que te duele o te lesionaste</label>
+      <select id="i_reg"><option value="">Elegí…</option><option>Cervical</option><option>Hombro</option><option>Codo</option><option>Muñeca / Mano</option><option>Columna dorsal</option><option>Columna lumbar</option><option>Cadera</option><option>Rodilla</option><option>Tobillo / Pie</option><option>Otra</option></select>
+      <div class="dos"><div><label class="l">Lado</label><select id="i_lado"><option value="">—</option><option>Derecho</option><option>Izquierdo</option><option>Ambos</option></select></div><div><label class="l">¿Desde cuándo?</label><input type="date" id="i_flesion"></div></div>
+      <label class="l">¿Qué te pasó? ¿Qué diagnóstico tenés?</label><textarea id="i_dx" placeholder="Ej: me torcí la rodilla jugando al fútbol; me dijeron que tengo un esguince"></textarea>
+      <label class="opt" id="o_op"><input type="checkbox" id="i_oper" onchange="this.parentNode.classList.toggle('on',this.checked)"> Fui operado/a de esa zona</label>
+      <label class="l">¿Qué médico te indicó kinesiología?</label>
+      <label class="opt on" id="o_eq"><input type="radio" name="mt" value="equipo" checked onchange="medico()"> <span><b>Dr. Muratori o su equipo</b><br><span class="muted">Tu kinesiólogo recibe el resumen de tus estudios</span></span></label>
+      <label class="opt" id="o_ex"><input type="radio" name="mt" value="externo" onchange="medico()"> Otro médico</label>
+      <div id="bx" class="oculto"><label class="l">Nombre del médico</label><input type="text" id="i_med"></div>
+      <div class="dos"><div><label class="l">Kinesiólogo que te atiende</label><input type="text" id="i_kine" value="Fernando Polidori" readonly style="background:#f1f5f9"></div><div><label class="l">Sesiones indicadas</label><input type="number" id="i_ses" min="1" max="60" inputmode="numeric" placeholder="Ej: 10"></div></div>
+      <label class="l">Día y horario que te convienen para el turno</label><input type="text" id="i_turno" placeholder="Ej: lunes y miércoles por la tarde">
+      <label class="l">📷 Foto de la orden médica</label>
+      <div class="foto"><img id="fotoPrev" class="oculto" alt="Orden"><div><input type="file" id="i_foto" accept="image/*" capture="environment" onchange="foto(this)"><div class="muted" id="fotoMsg">Sacale una foto clara a la orden. Es opcional pero ayuda a tu kinesiólogo.</div></div></div>
+      <div class="dos"><button class="btn s" onclick="paso(1)">Atrás</button><button class="btn" onclick="paso(3)">Siguiente</button></div><div class="err" id="e2"></div>
+    </div>
+
+    <div id="s3" class="card oculto">
+      <h2>3 de 3 · Consentimiento y firma</h2>
+      <p class="sub">Leelo y firmá con el dedo.</p>
+      <div class="aviso" style="background:#f0f9ff;border-color:#7dd3fc;color:#0c4a6e">Autorizo el uso de mis datos para mi atención kinésica y su intercambio con el médico que me indicó el tratamiento y con el equipo que me atiende, bajo secreto profesional (Ley 25.326). Entiendo que mi firma en cada presente y salida certifica mi asistencia y mi conformidad, y que puedo pedir el acceso o la corrección de mis datos.</div>
+      <label class="opt" id="o_cons"><input type="checkbox" id="i_cons" onchange="this.parentNode.classList.toggle('on',this.checked)"> Leí y acepto</label>
+      <label class="opt" id="o_memb"><input type="checkbox" id="i_memb" onchange="this.parentNode.classList.toggle('on',this.checked)"> <span>⭐ Quiero saber más de la <b>membresía de seguimiento</b> (opcional, no tiene costo consultar)</span></label>
+      <label class="l">Tu firma</label>
+      <canvas class="pad" id="pad_i"></canvas>
+      <div class="padbar"><span>Firmá dentro del recuadro</span><button onclick="padLimpiar('pad_i')">Borrar</button></div>
+      <div class="dos"><button class="btn s" onclick="paso(2)">Atrás</button><button class="btn v" id="btnInsc" onclick="enviarInsc()">Enviar inscripción</button></div><div class="err" id="e3"></div>
+    </div>
+  </div>
+
+  <!-- IDENTIFICACIÓN -->
+  <div id="v-ident" class="oculto">
+    <a class="back" onclick="ir('home')">← Volver</a>
+    <div class="card"><h2 id="idTit">Ya soy paciente</h2><p class="sub" id="idSub">Para marcar tu presente o tu salida, decinos quién sos.</p>
+      <label class="l">DNI</label><input type="tel" id="d_dni" inputmode="numeric" maxlength="9">
+      <label class="l">Fecha de nacimiento</label><input type="date" id="d_fnac">
+      <button class="btn" id="btnId" onclick="identificar()">Continuar</button><div class="err" id="eId"></div>
+    </div>
+  </div>
+
+  <!-- MENSAJE POR MAIL -->
+  <div id="v-msg" class="oculto">
+    <a class="back" onclick="ir('home')">← Volver</a>
+    <div class="card"><h2>✉️ Mensaje para Fernando</h2><p class="sub" id="msgSub">Le llega por mail y te responde directo.</p>
+      <label class="l">Tu mensaje</label><textarea id="m_txt" maxlength="1500" placeholder="Ej: ¿Puedo cambiar el turno del jueves? Hoy me dolió más al terminar."></textarea>
+      <label class="l">Tu mail para la respuesta (opcional si ya dejaste uno)</label><input type="email" id="m_mail" autocomplete="email">
+      <button class="btn v" id="btnMsg" onclick="enviarMensaje()">Enviar mensaje</button><div class="err" id="eMsg"></div>
+      <p class="muted" style="margin-top:10px">No es para urgencias: si tenés dolor muy fuerte, fiebre o pérdida de fuerza, consultá en guardia.</p>
+    </div>
+  </div>
+
+  <!-- MEMBRESÍA -->
+  <div id="v-mem" class="oculto">
+    <a class="back" onclick="ir('home')">← Volver</a>
+    <div class="card mem"><h2 style="color:#9d174d">⭐ Membresía de seguimiento</h2>
+      <p class="sub" id="memEst"></p>
+      <p style="font-size:14px;margin:6px 0">Un seguimiento continuo de tu evolución con <b>Fernando Polidori</b>: control mensual de tus parámetros, comunicación directa por mail y tu informe de evolución al alta (qué se hizo, puntos de evaluación y concordancia entre tu opinión y la del terapeuta).</p>
+      <div class="precio" id="memPrecio"></div>
+      <div id="memPago" class="muted"></div>
+      <button class="btn" id="btnMem" style="background:#be185d" onclick="solicitarMembresia()">Quiero la membresía</button><div class="err" id="eMem"></div>
+      <div id="memRes" class="aviso oculto" style="background:#ecfdf5;border-color:#6ee7b7;color:#064e3b"></div>
+      <p class="muted" style="margin-top:10px">El pago no se hace en esta página: Fernando confirma el pago y te activa la membresía.</p>
+    </div>
+  </div>
+
+  <!-- PRESENTE -->
+  <div id="v-pres" class="oculto">
+    <div class="card"><h2 id="presTit">Marcar presente</h2><p class="sub" id="presSub"></p>
+      <label class="l">¿Cómo llegás hoy? (0 = muy mal · 10 = muy bien)</label>
+      <div class="esc" id="esc_e"></div><div class="extremos"><span>muy mal</span><span>muy bien</span></div>
+      <label class="l">Tu firma (certifica que estás presente)</label>
+      <canvas class="pad" id="pad_e"></canvas><div class="padbar"><span>Firmá con el dedo</span><button onclick="padLimpiar('pad_e')">Borrar</button></div>
+      <button class="btn v" id="btnEnt" onclick="enviarEntrada()">Marcar mi presente</button><div class="err" id="eEnt"></div>
+    </div>
+  </div>
+
+  <!-- SALIDA -->
+  <div id="v-sal" class="oculto">
+    <div class="card"><h2>Registrar mi salida</h2><p class="sub" id="salSub"></p>
+      <label class="l">¿Cómo te sentís al terminar? (0 = muy mal · 10 = muy bien)</label>
+      <div class="esc" id="esc_s"></div><div class="extremos"><span>muy mal</span><span>muy bien</span></div>
+      <label class="l">¿Cómo fue la atención de hoy?</label>
+      <label class="opt" id="c1"><input type="radio" name="cf" value="conforme" onchange="conf()"> 👍 Estoy conforme</label>
+      <label class="opt" id="c2"><input type="radio" name="cf" value="con_reparos" onchange="conf()"> 🤔 Tengo reparos (los podés contar abajo)</label>
+      <label class="l">Tu comentario (opcional)</label><textarea id="s_com" maxlength="600" placeholder="Qué sentiste, qué te gustó o qué mejorarías"></textarea>
+      <label class="l">Tu firma (certifica tu conformidad y tu sensación)</label>
+      <canvas class="pad" id="pad_s"></canvas><div class="padbar"><span>Firmá con el dedo</span><button onclick="padLimpiar('pad_s')">Borrar</button></div>
+      <button class="btn v" id="btnSal" onclick="enviarSalida()">Registrar mi salida</button><div class="err" id="eSal"></div>
+    </div>
+  </div>
+
+  <!-- FIN -->
+  <div id="v-fin" class="oculto"><div class="card ok"><div class="gr" id="finIco">✅</div><h2 id="finTit">¡Listo!</h2><p id="finMsg"></p><button class="btn s" onclick="location.reload()">Volver al inicio</button></div></div>
+
+  <p class="pie">Polidori Kinesiología · Bienestar en movimiento<br>Si sentís dolor muy fuerte, pérdida de fuerza, fiebre o falta de control de esfínteres, no esperes: consultá en guardia.</p>
+</div>
+
+<script>
+const SHEETS_URL='https://script.google.com/macros/s/AKfycbwYdoFuU8mQL4YKqufSBQ9AD_yqWEEesLtGzYQjNw2JG1BZIQF7ug80mHB5sLMXhaUpvQ/exec';
+const CENTROS={sicoli:'Hospital Sicoli',espanol:'Hospital Español',palmares:'Centro Médico Palmares',sandona:'Clínica San Donà',altomaipu:'Centro Médico Alto Maipú',rehab:'Rehabilitarte Instituto Médico',norte:'Consultorios del Norte',consultorio:'Consultorio Dr. Muratori'};
+const qs=new URLSearchParams(location.search);
+const CENTRO=CENTROS[qs.get('centro')]?qs.get('centro'):'consultorio';
+document.getElementById('centroTag').textContent=CENTROS[CENTRO];
+const $=id=>document.getElementById(id);
+let ORDEN='', PERSONA=null, SENS={e:null,s:null}, MODO='asist';
+const MODOS={asist:['Ya soy paciente','Para marcar tu presente o tu salida, decinos quién sos.'],msg:['Escribirle a mi kinesiólogo','Primero decinos quién sos (DNI y fecha de nacimiento).'],mem:['Membresía de seguimiento','Decinos quién sos para solicitar o ver tu membresía.']};
+function ident(m){ MODO=m; $('idTit').textContent=MODOS[m][0]; $('idSub').textContent=MODOS[m][1]; $('eId').textContent=''; ir('ident'); }
+
+function ir(v){ ['home','insc','ident','pres','sal','msg','mem','fin'].forEach(x=>$('v-'+x).classList.toggle('oculto',x!==v)); window.scrollTo(0,0); if(v==='insc') paso(1); setTimeout(initPads,50); }
+function paso(n){
+  if(n>1){ const e=validar(n-1); if(e && n>(window._p||1)){ $('e'+(n-1)).textContent=e; return; } }
+  window._p=n; [1,2,3].forEach(i=>{ $('s'+i).classList.toggle('oculto',i!==n); $('p'+i).classList.toggle('on',i<=n); $('e'+i).textContent=''; });
+  window.scrollTo(0,0); setTimeout(initPads,50);
+}
+function validar(n){
+  if(n===1){
+    if(!$('i_ape').value.trim()||!$('i_nom').value.trim()) return 'Completá apellido y nombre.';
+    const d=$('i_dni').value.replace(/\D/g,''); if(d.length<6||d.length>9) return 'Revisá el DNI.';
+    if(!$('i_fnac').value) return 'Completá la fecha de nacimiento.';
+    if(!$('i_tel').value.trim()) return 'Dejanos un teléfono de contacto.';
+    const m=$('i_mail').value.trim(); if(m && !/^\S+@\S+\.\S+$/.test(m)) return 'El mail no parece válido.';
+  }
+  if(n===2){
+    if(!$('i_reg').value) return 'Elegí la zona.';
+    if(!$('i_dx').value.trim()) return 'Contanos qué te pasó.';
+    if(document.querySelector('input[name=mt]:checked').value==='externo' && !$('i_med').value.trim()) return 'Escribí el nombre del médico.';
+  }
+  return '';
+}
+function medico(){ const ext=document.querySelector('input[name=mt]:checked').value==='externo'; $('bx').classList.toggle('oculto',!ext); $('o_ex').classList.toggle('on',ext); $('o_eq').classList.toggle('on',!ext); }
+function conf(){ const v=document.querySelector('input[name=cf]:checked'); $('c1').classList.toggle('on',v&&v.value==='conforme'); $('c2').classList.toggle('on',v&&v.value==='con_reparos'); }
+
+// ── foto de la orden: se reduce en el celular antes de enviarla ──
+function foto(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  const img=new Image(), url=URL.createObjectURL(f);
+  img.onload=()=>{
+    const M=1400, k=Math.min(1,M/Math.max(img.width,img.height)), c=document.createElement('canvas');
+    c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    ORDEN=c.toDataURL('image/jpeg',0.72); URL.revokeObjectURL(url);
+    $('fotoPrev').src=ORDEN; $('fotoPrev').classList.remove('oculto');
+    $('fotoMsg').textContent=ORDEN.length>5500000?'La foto es muy pesada: sacala de nuevo más cerca.':'✅ Foto lista. Si no se lee bien, sacala de nuevo.';
+    if(ORDEN.length>5500000) ORDEN='';
+  };
+  img.onerror=()=>{ $('fotoMsg').textContent='No pude leer la foto. Probá de nuevo.'; };
+  img.src=url;
+}
+
+// ── el celular se convierte en un pad de firma ──
+const PADS={};
+function initPads(){
+  ['pad_i','pad_e','pad_s'].forEach(id=>{
+    const c=$(id); if(!c||c.offsetParent===null||PADS[id]) return;
+    const dpr=window.devicePixelRatio||1, w=c.clientWidth, h=c.clientHeight; c.width=w*dpr; c.height=h*dpr;
+    const g=c.getContext('2d'); g.scale(dpr,dpr); g.lineWidth=2.4; g.lineCap='round'; g.lineJoin='round'; g.strokeStyle='#0f172a';
+    const st={dibujando:false,largo:0,x:0,y:0};
+    const pos=e=>{ const r=c.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
+    c.addEventListener('pointerdown',e=>{ e.preventDefault(); c.setPointerCapture(e.pointerId); st.dibujando=true; [st.x,st.y]=pos(e); g.beginPath(); g.moveTo(st.x,st.y); g.lineTo(st.x+.1,st.y+.1); g.stroke(); });
+    c.addEventListener('pointermove',e=>{ if(!st.dibujando) return; e.preventDefault(); const [x,y]=pos(e); st.largo+=Math.hypot(x-st.x,y-st.y); g.beginPath(); g.moveTo(st.x,st.y); g.lineTo(x,y); g.stroke(); st.x=x; st.y=y; });
+    const fin=()=>{ st.dibujando=false; };
+    c.addEventListener('pointerup',fin); c.addEventListener('pointercancel',fin); c.addEventListener('pointerleave',fin);
+    PADS[id]={c:c,g:g,st:st,w:w,h:h};
+  });
+}
+function padLimpiar(id){ const p=PADS[id]; if(!p) return; p.g.clearRect(0,0,p.w,p.h); p.st.largo=0; }
+function padFirma(id){
+  const p=PADS[id]; if(!p||p.st.largo<60) return '';
+  const o=document.createElement('canvas'); o.width=480; o.height=Math.round(480*p.h/p.w); const g=o.getContext('2d');
+  g.fillStyle='#fff'; g.fillRect(0,0,o.width,o.height); g.drawImage(p.c,0,0,o.width,o.height);
+  return o.toDataURL('image/png');
+}
+
+// ── escala 0-10 ──
+function escala(id,key){
+  const col=i=>['#dc2626','#dc2626','#ea580c','#ea580c','#d97706','#ca8a04','#65a30d','#65a30d','#16a34a','#16a34a','#15803d'][i];
+  const cont=$(id); cont.innerHTML='';
+  for(let i=0;i<=10;i++){ const b=document.createElement('button'); b.type='button'; b.textContent=i;
+    b.onclick=()=>{ SENS[key]=i; [...cont.children].forEach((x,j)=>{ x.classList.toggle('on',j===i); x.style.background=j===i?col(i):'#fff'; }); };
+    cont.appendChild(b); }
+}
+escala('esc_e','e'); escala('esc_s','s');
+
+function post(cuerpo){
+  return fetch(SHEETS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(cuerpo)}).then(r=>r.json());
+}
+function fin(ico,tit,msg){ $('finIco').textContent=ico; $('finTit').textContent=tit; $('finMsg').textContent=msg; ir('fin'); }
+function deshab(id,t,on){ const b=$(id); b.disabled=on; if(t) b.textContent=t; }
+
+function enviarInsc(){
+  $('e3').textContent='';
+  if(!$('i_cons').checked){ $('e3').textContent='Tildá "Leí y acepto" para continuar.'; return; }
+  const firma=padFirma('pad_i'); if(!firma){ $('e3').textContent='Firmá con el dedo dentro del recuadro.'; return; }
+  const mt=document.querySelector('input[name=mt]:checked').value;
+  deshab('btnInsc','Enviando…',true);
+  post({action:'kin_inscribir',centro:CENTRO,apellido:$('i_ape').value,nombre:$('i_nom').value,dni:$('i_dni').value,fnac:$('i_fnac').value,telefono:$('i_tel').value,sexo:$('i_sexo').value,email:$('i_mail').value,os:$('i_os').value,afiliado:$('i_afi').value,
+    region:$('i_reg').value,lado:$('i_lado').value,fecha_lesion:$('i_flesion').value,diagnostico:$('i_dx').value,operado:$('i_oper').checked,medico_tipo:mt,medico_nombre:mt==='externo'?$('i_med').value:'',kinesiologo:'Fernando Polidori',
+    sesiones:$('i_ses').value,turno_pref:$('i_turno').value,membresia:$('i_memb').checked,orden:ORDEN,consentimiento:true,firma:firma}).then(r=>{
+    deshab('btnInsc','Enviar inscripción',false);
+    if(!r.success){ $('e3').textContent=r.error||'No se pudo enviar. Intentá de nuevo.'; return; }
+    fin('✅','¡Inscripción enviada!',(r.message||'')+(r.ordenVinculada?' Tu orden del Dr. Muratori ya estaba en el centro y quedó vinculada a tu historia.':'')+(r.ordenGuardada||r.ordenVinculada?'':' (No se recibió la foto de la orden: traela impresa a la primera sesión.)')+' Guardá este QR: es el mismo para marcar presente y salida.');
+  }).catch(()=>{ deshab('btnInsc','Enviar inscripción',false); $('e3').textContent='No se pudo enviar: revisá tu conexión e intentá de nuevo.'; });
+}
+
+function identificar(){
+  $('eId').textContent=''; const dni=$('d_dni').value.replace(/\D/g,''), fn=$('d_fnac').value;
+  if(dni.length<6||!fn){ $('eId').textContent='Completá tu DNI y tu fecha de nacimiento.'; return; }
+  deshab('btnId','Buscando…',true);
+  post({action:'kin_identificar',dni:dni,fnac:fn}).then(r=>{
+    deshab('btnId','Continuar',false);
+    if(!r.success){ $('eId').textContent=r.error||'No pudimos identificarte.'; return; }
+    if(r.estado==='alta' && MODO==='asist'){ $('eId').textContent='Tu tratamiento ya tiene el alta. Si necesitás más sesiones, consultá a tu médico.'; return; }
+    PERSONA={dni:dni,fnac:fn,nombre:r.nombre,membresia:r.membresia||'',vence:r.membresia_vence||''};
+    if(MODO==='msg'){ $('msgSub').textContent='Hola '+r.nombre+'. Le llega por mail a Fernando y te responde directo.'; ir('msg'); return; }
+    if(MODO==='mem'){ abrirMembresia(); return; }
+    if(r.sesionAbierta){ $('salSub').textContent='Hola '+r.nombre+'. Sesión '+r.n_proxima+(r.prescriptas?' de '+r.prescriptas:'')+'.'; ir('sal'); }
+    else { $('presTit').textContent='Hola '+r.nombre; $('presSub').textContent='Sesión '+r.n_proxima+(r.prescriptas?' de '+r.prescriptas:'')+'. Marcá tu presente.'; ir('pres'); }
+  }).catch(()=>{ deshab('btnId','Continuar',false); $('eId').textContent='Revisá tu conexión e intentá de nuevo.'; });
+}
+function enviarMensaje(){
+  $('eMsg').textContent=''; const t=$('m_txt').value.trim(), m=$('m_mail').value.trim();
+  if(t.length<5){ $('eMsg').textContent='Escribí tu mensaje.'; return; }
+  if(m && !/^\S+@\S+\.\S+$/.test(m)){ $('eMsg').textContent='El mail no parece válido.'; return; }
+  deshab('btnMsg','Enviando…',true);
+  post({action:'kin_mensaje',dni:PERSONA.dni,fnac:PERSONA.fnac,mensaje:t,email:m}).then(r=>{
+    deshab('btnMsg','Enviar mensaje',false);
+    if(!r.success){ $('eMsg').textContent=r.error||'No se pudo enviar.'; return; }
+    fin('✉️','Mensaje enviado',r.message||'Tu mensaje fue enviado.');
+  }).catch(()=>{ deshab('btnMsg','Enviar mensaje',false); $('eMsg').textContent='Revisá tu conexión e intentá de nuevo.'; });
+}
+const MEMTXT={activa:'✅ Tu membresía está activa',vencida:'⚠️ Tu membresía venció',solicitada:'⏳ Ya solicitaste la membresía: falta confirmar el pago',inactiva:'Membresía inactiva',desconocido:''};
+function abrirMembresia(){
+  $('eMem').textContent=''; $('memRes').classList.add('oculto'); $('memPrecio').textContent=''; $('memPago').textContent='';
+  const e=PERSONA.membresia; $('memEst').textContent=(MEMTXT[e]||'Hola '+PERSONA.nombre+'.')+(e==='activa'&&PERSONA.vence?' hasta el '+PERSONA.vence:'');
+  $('btnMem').classList.toggle('oculto',e==='activa'); $('btnMem').textContent=(e==='solicitada')?'Ver cómo abonar':'Quiero la membresía';
+  ir('mem');
+  post({action:'kin_membresia_info'}).then(r=>{ if(r&&r.success) pintarPago(r); }).catch(()=>{});
+}
+function pintarPago(r){
+  $('memPrecio').textContent=r.precio||'';
+  const p=[]; if(r.alias) p.push('Alias para transferir: '+r.alias);
+  $('memPago').textContent=p.join(' · ')||(r.configurada?'':'El valor y la forma de pago te los confirma Fernando.');
+  const old=$('memLink'); if(old) old.remove();
+  if(r.link && /^https:\/\//.test(r.link)){ const a=document.createElement('a'); a.id='memLink'; a.href=r.link; a.target='_blank'; a.rel='noopener'; a.textContent='💳 Abonar con el link de pago'; a.style.cssText='display:block;margin-top:8px;font-weight:800;color:#9d174d'; $('memPago').after(a); }
+}
+function solicitarMembresia(){
+  $('eMem').textContent=''; deshab('btnMem','Enviando…',true);
+  post({action:'kin_membresia_solicitar',dni:PERSONA.dni,fnac:PERSONA.fnac}).then(r=>{
+    deshab('btnMem','Quiero la membresía',false);
+    if(!r.success){ $('eMem').textContent=r.error||'No se pudo solicitar.'; return; }
+    PERSONA.membresia=r.estado||PERSONA.membresia; pintarPago(r);
+    $('memRes').textContent=r.message||'Solicitud registrada.'; $('memRes').classList.remove('oculto'); $('btnMem').classList.add('oculto');
+  }).catch(()=>{ deshab('btnMem','Quiero la membresía',false); $('eMem').textContent='Revisá tu conexión e intentá de nuevo.'; });
+}
+function enviarEntrada(){
+  $('eEnt').textContent=''; const firma=padFirma('pad_e');
+  if(SENS.e==null){ $('eEnt').textContent='Marcá cómo llegás hoy (0 a 10).'; return; }
+  if(!firma){ $('eEnt').textContent='Firmá con el dedo dentro del recuadro.'; return; }
+  deshab('btnEnt','Enviando…',true);
+  post({action:'kin_entrada',dni:PERSONA.dni,fnac:PERSONA.fnac,sensacion:SENS.e,firma:firma}).then(r=>{
+    deshab('btnEnt','Marcar mi presente',false);
+    if(!r.success){ $('eEnt').textContent=r.error||'No se pudo registrar.'; return; }
+    fin('✅','Presente registrado',(r.message||'')+' Al terminar, escaneá este mismo QR para registrar tu salida.');
+  }).catch(()=>{ deshab('btnEnt','Marcar mi presente',false); $('eEnt').textContent='Revisá tu conexión e intentá de nuevo.'; });
+}
+function enviarSalida(){
+  $('eSal').textContent=''; const firma=padFirma('pad_s'), cf=document.querySelector('input[name=cf]:checked');
+  if(SENS.s==null){ $('eSal').textContent='Marcá cómo te sentís al terminar (0 a 10).'; return; }
+  if(!cf){ $('eSal').textContent='Indicá si estás conforme con la atención de hoy.'; return; }
+  if(!firma){ $('eSal').textContent='Firmá con el dedo dentro del recuadro.'; return; }
+  deshab('btnSal','Enviando…',true);
+  post({action:'kin_salida',dni:PERSONA.dni,fnac:PERSONA.fnac,sensacion:SENS.s,conforme:cf.value,comentario:$('s_com').value,firma:firma}).then(r=>{
+    deshab('btnSal','Registrar mi salida',false);
+    if(!r.success){ $('eSal').textContent=r.error||'No se pudo registrar.'; return; }
+    fin('🙌','¡Gracias!',r.message||'Tu salida quedó registrada.');
+  }).catch(()=>{ deshab('btnSal','Registrar mi salida',false); $('eSal').textContent='Revisá tu conexión e intentá de nuevo.'; });
+}
+</script>
+</body>
+</html>
